@@ -1,9 +1,27 @@
 import { promises as fs } from "fs";
 import path from "path";
+import { Readable } from "stream";
 import { requireAuth } from "@/lib/auth";
-import { getStorageProvider } from "@/lib/storage";
+import { getStorageProvider, getProofsBucket, gridFsObjectId, isGridFsPath } from "@/lib/storage";
 import { jsonError, handleApiError } from "@/lib/api";
 import { NextResponse } from "next/server";
+
+const mimeMap: Record<string, string> = {
+  ".pdf": "application/pdf",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+  ".doc": "application/msword",
+  ".docx":
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+};
+
+function mimeFromFilename(filename: string): string {
+  const ext = path.extname(filename).toLowerCase();
+  return mimeMap[ext] || "application/octet-stream";
+}
 
 export async function GET(
   _request: Request,
@@ -16,6 +34,30 @@ export async function GET(
 
     if (!storedPath || storedPath.includes("..")) {
       return jsonError("Invalid file path", 400);
+    }
+
+    if (isGridFsPath(storedPath)) {
+      const bucket = await getProofsBucket();
+      const fileId = gridFsObjectId(storedPath);
+      const files = await bucket.find({ _id: fileId }).toArray();
+      if (!files.length) {
+        return jsonError("File not found", 404);
+      }
+
+      const meta = files[0];
+      const metadata = meta.metadata as { originalName?: string; mimeType?: string } | undefined;
+      const downloadName = metadata?.originalName || meta.filename;
+      const contentType = metadata?.mimeType || mimeFromFilename(meta.filename);
+
+      const downloadStream = bucket.openDownloadStream(fileId);
+      const webStream = Readable.toWeb(downloadStream) as ReadableStream;
+
+      return new NextResponse(webStream, {
+        headers: {
+          "Content-Type": contentType,
+          "Content-Disposition": `inline; filename="${downloadName}"`,
+        },
+      });
     }
 
     const storage = getStorageProvider();
@@ -31,17 +73,6 @@ export async function GET(
 
     const buffer = await fs.readFile(absolutePath);
     const ext = path.extname(storedPath).toLowerCase();
-    const mimeMap: Record<string, string> = {
-      ".pdf": "application/pdf",
-      ".png": "image/png",
-      ".jpg": "image/jpeg",
-      ".jpeg": "image/jpeg",
-      ".webp": "image/webp",
-      ".gif": "image/gif",
-      ".doc": "application/msword",
-      ".docx":
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    };
 
     return new NextResponse(buffer, {
       headers: {
