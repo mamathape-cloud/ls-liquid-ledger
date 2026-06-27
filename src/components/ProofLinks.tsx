@@ -16,7 +16,7 @@ export function ProofLinks({ files }: { files?: ProofFile[] | unknown }) {
           href={`/api/uploads/${file.storedPath}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-sm text-blue-600 underline hover:text-blue-800"
+          className="text-sm text-[var(--primary)] underline hover:text-[var(--primary-hover)]"
           onClick={(e) => e.stopPropagation()}
         >
           {file.originalName}

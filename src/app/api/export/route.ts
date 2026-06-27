@@ -48,7 +48,7 @@ export async function GET(request: Request) {
 
     if (format === "xlsx") {
       const buffer = await rowsToExcelBuffer(rows, table);
-      return new NextResponse(buffer, {
+      return new NextResponse(new Uint8Array(buffer), {
         headers: {
           "Content-Type":
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

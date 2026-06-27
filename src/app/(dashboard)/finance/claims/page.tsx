@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/Label";
 import { ProofLinks } from "@/components/ProofLinks";
 import { ClaimStatusCell } from "@/components/ClaimStatusCell";
 import { ClaimDetailModal } from "@/components/ClaimDetailModal";
+import { PageHeader } from "@/components/layout/ThunderModules";
 import { formatINR, formatDate, formatStatus } from "@/lib/utils";
 import { CLAIM_STATUSES } from "@/lib/constants";
 
@@ -69,7 +70,7 @@ export default function FinanceClaimsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Review Claims</h1>
+      <PageHeader title="Review Claims" />
 
       <Card>
         <DataTable
@@ -146,7 +147,7 @@ export default function FinanceClaimsPage() {
                       href={`/api/uploads/${file.storedPath}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-blue-600 hover:underline"
+                      className="text-sm text-[var(--primary)] hover:underline"
                     >
                       {file.originalName}
                     </a>

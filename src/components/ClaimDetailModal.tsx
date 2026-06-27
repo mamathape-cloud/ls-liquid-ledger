@@ -158,9 +158,9 @@ export function ClaimDetailModal({
             ] as string[]
           ).includes(claim.status) &&
             claim.financeReviewedAt && (
-              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
-                <p className="font-medium text-blue-800">Finance Approval</p>
-                <p className="mt-1 text-sm text-blue-700">
+              <div className="rounded-lg border border-[var(--primary-muted)]/40 bg-[var(--primary-soft)] p-3">
+                <p className="font-medium text-[var(--primary-hover)]">Finance Approval</p>
+                <p className="mt-1 text-sm text-[var(--primary)]">
                   Approved on {formatDate(claim.financeReviewedAt)}
                   {claim.financeReviewerId && ` by ${populatedName(claim.financeReviewerId)}`}
                 </p>

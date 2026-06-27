@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { DataTable } from "@/components/DataTable";
+import { BatchClaimSelector } from "@/components/BatchClaimSelector";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 import { Label } from "@/components/ui/Label";
-import { Input } from "@/components/ui/Input";
+import { PageHeader } from "@/components/layout/ThunderModules";
 import { formatINR, formatStatus } from "@/lib/utils";
+import { downloadFile } from "@/lib/download";
 import { CLAIM_STATUSES, BATCH_STATUSES } from "@/lib/constants";
 
 export default function FinanceBatchesPage() {
@@ -16,23 +18,30 @@ export default function FinanceBatchesPage() {
   const [eventId, setEventId] = useState("");
   const [approvedClaims, setApprovedClaims] = useState<Record<string, unknown>[]>([]);
   const [selectedClaimIds, setSelectedClaimIds] = useState<string[]>([]);
+  const [loadingClaims, setLoadingClaims] = useState(false);
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const loadApprovedClaims = useCallback(async () => {
     if (!eventId) {
       setApprovedClaims([]);
       return;
     }
-    const res = await fetch(
-      `/api/claims?filter.eventId=${eventId}&filter.status=${CLAIM_STATUSES.FINANCE_APPROVED}&filter.unbatched=true&limit=100`
-    );
-    const d = await res.json();
-    setApprovedClaims(d.data || []);
-    setSelectedClaimIds([]);
+    setLoadingClaims(true);
+    try {
+      const res = await fetch(
+        `/api/claims?filter.eventId=${eventId}&filter.status=${CLAIM_STATUSES.FINANCE_APPROVED}&filter.unbatched=true&limit=500`
+      );
+      const d = await res.json();
+      setApprovedClaims(d.data || []);
+      setSelectedClaimIds([]);
+    } finally {
+      setLoadingClaims(false);
+    }
   }, [eventId]);
 
   useEffect(() => {
-    fetch("/api/events?limit=100")
+    fetch("/api/events?limit=200")
       .then((r) => r.json())
       .then((d) => setEvents(d.data || []));
   }, []);
@@ -53,28 +62,47 @@ export default function FinanceBatchesPage() {
       setError("Select an event and at least one claim");
       return;
     }
-    const res = await fetch("/api/batches", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ eventId, claimIds: selectedClaimIds }),
-    });
-    const json = await res.json();
-    if (!res.ok) {
-      setError(json.message || "Failed to create batch");
-      return;
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/batches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId, claimIds: selectedClaimIds }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.message || "Failed to create batch");
+        return;
+      }
+      setSelectedClaimIds([]);
+      setRefreshKey((k) => k + 1);
+      await loadApprovedClaims();
+    } finally {
+      setSubmitting(false);
     }
-    setSelectedClaimIds([]);
-    setRefreshKey((k) => k + 1);
-    await loadApprovedClaims();
   };
 
-  const exportPayout = (batchId: string) => {
-    window.open(`/api/batches/${batchId}/export`);
+  const exportPayout = async (batchId: string) => {
+    try {
+      await downloadFile(`/api/batches/${batchId}/export`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Export failed");
+    }
   };
+
+  const selectorClaims = approvedClaims.map((c) => ({
+    _id: String(c._id),
+    claimId: String(c.claimId),
+    employeeName: String(c.employeeName || ""),
+    amount: Number(c.amount),
+    claimDate: c.claimDate ? String(c.claimDate) : undefined,
+    categoryName: c.categoryName ? String(c.categoryName) : undefined,
+    reason: c.reason ? String(c.reason) : undefined,
+  }));
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Approval Batches</h1>
+      <PageHeader title="Approval Batches" />
 
       <Card>
         <h2 className="mb-4 font-semibold">Club Claims for Director Approval</h2>
@@ -87,19 +115,17 @@ export default function FinanceBatchesPage() {
             ))}
           </Select>
         </div>
-        {approvedClaims.length > 0 ? (
-          <div className="space-y-2">
-            {approvedClaims.map((c) => (
-              <label key={String(c._id)} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={selectedClaimIds.includes(String(c._id))}
-                  onChange={() => toggleClaim(String(c._id))}
-                />
-                {String(c.claimId)} — {String(c.employeeName)} — {formatINR(Number(c.amount))}
-              </label>
-            ))}
-          </div>
+
+        {loadingClaims ? (
+          <p className="text-sm text-slate-500">Loading claims...</p>
+        ) : approvedClaims.length > 0 ? (
+          <BatchClaimSelector
+            claims={selectorClaims}
+            selectedIds={selectedClaimIds}
+            onToggle={toggleClaim}
+            onSelectAll={setSelectedClaimIds}
+            onClear={() => setSelectedClaimIds([])}
+          />
         ) : (
           <p className="text-sm text-slate-500">
             {eventId
@@ -107,8 +133,11 @@ export default function FinanceBatchesPage() {
               : "Select an event to view claims."}
           </p>
         )}
+
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-        <Button className="mt-4" onClick={submitBatch}>Submit Batch to Director</Button>
+        <Button className="mt-4" onClick={submitBatch} disabled={submitting || !selectedClaimIds.length}>
+          {submitting ? "Submitting..." : `Submit Batch to Director (${selectedClaimIds.length})`}
+        </Button>
       </Card>
 
       <Card>

@@ -13,7 +13,11 @@ import { normalizePhone } from "@/lib/utils";
 
 export async function GET(request: Request) {
   try {
-    await requireRoles([ROLES.SYSTEM_ADMIN, ROLES.FINANCE]);
+    const session = await requireRoles([
+      ROLES.SYSTEM_ADMIN,
+      ROLES.FINANCE,
+      ROLES.DIRECTOR,
+    ]);
     await connectDB();
 
     const { searchParams } = new URL(request.url);
@@ -25,6 +29,11 @@ export async function GET(request: Request) {
 
     if (filters.role) query.role = filters.role;
     if (filters.status) query.status = filters.status;
+
+    if (session.role === ROLES.DIRECTOR) {
+      query.role = ROLES.EMPLOYEE;
+      query.status = "ACTIVE";
+    }
 
     const skip = (page - 1) * limit;
     const [users, total] = await Promise.all([

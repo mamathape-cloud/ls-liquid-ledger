@@ -47,7 +47,7 @@ export default function SearchPage() {
               {results.map((c) => (
                 <div key={String(c._id)} className="rounded-lg border p-4">
                   <div className="flex flex-wrap justify-between gap-2">
-                    <h3 className="font-semibold text-blue-700">{String(c.claimId)}</h3>
+                    <h3 className="font-semibold text-[var(--primary)]">{String(c.claimId)}</h3>
                     <ClaimStatusCell
                       status={String(c.status)}
                       financeRejectionReason={c.financeRejectionReason as string | undefined}

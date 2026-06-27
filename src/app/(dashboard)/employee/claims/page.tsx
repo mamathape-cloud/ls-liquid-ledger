@@ -14,6 +14,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ProofLinks } from "@/components/ProofLinks";
 import { ClaimStatusCell } from "@/components/ClaimStatusCell";
 import { ClaimDetailModal } from "@/components/ClaimDetailModal";
+import { PageHeader } from "@/components/layout/ThunderModules";
 import { formatINR, formatDate } from "@/lib/utils";
 import { CLAIM_STATUSES } from "@/lib/constants";
 
@@ -148,7 +149,7 @@ export default function EmployeeClaimsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">My Claims</h1>
+      <PageHeader title="My Claims" />
 
       <Card>
         <h2 className="mb-4 font-semibold">Submit New Claim</h2>

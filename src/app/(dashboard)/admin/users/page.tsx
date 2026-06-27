@@ -239,7 +239,7 @@ export default function AdminUsersPage() {
         <p className="text-sm text-slate-600">
           Password for <strong>{resetResult?.name}</strong> ({resetResult?.phone}) has been reset to:
         </p>
-        <p className="mt-3 rounded-lg bg-blue-50 p-3 text-center font-mono text-lg font-bold text-blue-700">
+        <p className="mt-3 rounded-lg bg-[var(--primary-soft)] p-3 text-center font-mono text-lg font-bold text-[var(--primary)]">
           {resetResult?.newPassword}
         </p>
         <p className="mt-3 text-xs text-slate-500">Please share this password securely with the user.</p>

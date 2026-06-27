@@ -11,7 +11,7 @@ export interface ListQueryParams {
 export function parseListQuery(searchParams: URLSearchParams): ListQueryParams {
   const page = Math.max(1, Number(searchParams.get("page") || 1));
   const limit = Math.min(
-    50,
+    500,
     Math.max(1, Number(searchParams.get("limit") || DEFAULT_PAGE_SIZE))
   );
   const search = searchParams.get("search")?.trim() || "";

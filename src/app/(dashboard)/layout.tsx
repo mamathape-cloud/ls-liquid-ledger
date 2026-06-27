@@ -1,9 +1,9 @@
 "use client";
 
+import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
-import { Sidebar } from "@/components/Sidebar";
+import { ThunderShell } from "@/components/layout/ThunderShell";
 
 export default function DashboardLayout({
   children,
@@ -21,16 +21,11 @@ export default function DashboardLayout({
 
   if (loading || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--background)]">
         <p className="text-slate-500">Loading...</p>
       </div>
     );
   }
 
-  return (
-    <div className="flex min-h-screen bg-slate-50">
-      <Sidebar user={user} />
-      <main className="flex-1 overflow-auto bg-slate-50 p-6 text-slate-900">{children}</main>
-    </div>
-  );
+  return <ThunderShell user={user}>{children}</ThunderShell>;
 }

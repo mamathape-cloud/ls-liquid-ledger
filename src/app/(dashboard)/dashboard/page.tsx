@@ -1,53 +1,52 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { Card } from "@/components/ui/Card";
-import { ROLES } from "@/lib/constants";
-import Link from "next/link";
+import { getNavForRole } from "@/lib/navigation";
+import { ModuleGrid, WelcomeBanner } from "@/components/layout/ThunderModules";
+import { Input } from "@/components/ui/Input";
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    fetch("/api/notifications?limit=1")
+      .then((r) => r.json())
+      .then((d) => setUnreadCount(d.unreadCount || 0));
+  }, []);
 
   if (!user) return null;
 
-  const quickLinks: Record<string, { label: string; href: string; desc: string }[]> = {
-    [ROLES.SYSTEM_ADMIN]: [
-      { label: "Manage Users", href: "/admin/users", desc: "Create finance, director, and employee accounts" },
-      { label: "Categories", href: "/admin/categories", desc: "Manage claim categories" },
-      { label: "Reports", href: "/reports", desc: "Organisation-wide reports" },
-    ],
-    [ROLES.FINANCE]: [
-      { label: "Events", href: "/finance/events", desc: "Create events and assign budgets" },
-      { label: "Review Claims", href: "/finance/claims", desc: "Approve or reject employee claims" },
-      { label: "Batches", href: "/finance/batches", desc: "Club claims and submit to director" },
-      { label: "Disburse", href: "/finance/disburse", desc: "Mark claims as paid" },
-    ],
-    [ROLES.DIRECTOR]: [
-      { label: "Review Batches", href: "/director/batches", desc: "Approve or reject batched claims" },
-      { label: "Reports", href: "/reports", desc: "View organisation reports" },
-    ],
-    [ROLES.EMPLOYEE]: [
-      { label: "Submit Claim", href: "/employee/claims", desc: "Create reimbursement requests" },
-      { label: "My Profile", href: "/employee/profile", desc: "Update UPI and bank details" },
-      { label: "Track Claim", href: "/search", desc: "Search by claim ID" },
-    ],
-  };
+  const nav = getNavForRole(user.role).filter((item) => item.href !== "/dashboard");
+  const filtered = search.trim()
+    ? nav.filter(
+        (item) =>
+          item.label.toLowerCase().includes(search.toLowerCase()) ||
+          item.description.toLowerCase().includes(search.toLowerCase())
+      )
+    : nav;
 
-  const links = quickLinks[user.role] || [];
+  const quick = filtered.filter((item) => item.section === "quick");
+  const modules = filtered.filter((item) => item.section !== "quick");
 
   return (
-    <div>
-      <h1 className="mb-2 text-2xl font-bold text-slate-900">Welcome, {user.name}</h1>
-      <p className="mb-6 text-slate-500">Liquid Ledger expense management dashboard</p>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {links.map((link) => (
-          <Link key={link.href} href={link.href}>
-            <Card className="transition hover:border-blue-200 hover:shadow-md">
-              <h3 className="font-semibold text-blue-700">{link.label}</h3>
-              <p className="mt-1 text-sm text-slate-500">{link.desc}</p>
-            </Card>
-          </Link>
-        ))}
+    <div className="pb-2">
+      <WelcomeBanner name={user.name} unreadCount={unreadCount} />
+
+      <div className="mb-6">
+        <Input
+          placeholder="Search modules..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="rounded-2xl py-3.5 pl-4"
+        />
+      </div>
+
+      <div className="space-y-8">
+        <ModuleGrid title="Quick Actions" items={quick} variant="compact" />
+        <ModuleGrid title="All Modules" items={modules} variant="large" />
       </div>
     </div>
   );

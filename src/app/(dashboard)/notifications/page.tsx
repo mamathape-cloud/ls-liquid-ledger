@@ -89,7 +89,7 @@ export default function NotificationsPage() {
           onClick={() => setTab("unread")}
           className={`px-4 py-2 text-sm font-medium ${
             tab === "unread"
-              ? "border-b-2 border-blue-600 text-blue-600"
+              ? "border-b-2 border-[var(--primary)] text-[var(--primary)]"
               : "text-slate-500 hover:text-slate-700"
           }`}
         >
@@ -100,7 +100,7 @@ export default function NotificationsPage() {
           onClick={() => setTab("read")}
           className={`px-4 py-2 text-sm font-medium ${
             tab === "read"
-              ? "border-b-2 border-blue-600 text-blue-600"
+              ? "border-b-2 border-[var(--primary)] text-[var(--primary)]"
               : "text-slate-500 hover:text-slate-700"
           }`}
         >
@@ -127,7 +127,7 @@ export default function NotificationsPage() {
                       {new Date(n.createdAt).toLocaleString("en-IN")}
                     </p>
                     {n.link && (
-                      <Link href={n.link} className="mt-2 inline-block text-sm text-blue-600 hover:underline">
+                      <Link href={n.link} className="mt-2 inline-block text-sm text-[var(--primary)] hover:underline">
                         View details
                       </Link>
                     )}

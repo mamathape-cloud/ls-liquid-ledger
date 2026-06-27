@@ -6,8 +6,42 @@ import { ApprovalBatch } from "@/models/ApprovalBatch";
 import { requireRoles } from "@/lib/auth";
 import { rowsToCsv, rowsToExcelBuffer } from "@/lib/export";
 import { jsonOk, jsonError, handleApiError } from "@/lib/api";
+import { formatStatus } from "@/lib/utils";
 import { ROLES } from "@/lib/constants";
 import { NextResponse } from "next/server";
+
+function formatClaimRow(c: {
+  claimId: string;
+  amount: number;
+  status: string;
+  claimDate: Date;
+  reason?: string;
+  employeeId?: { name?: string } | unknown;
+  eventId?: { name?: string } | unknown;
+  categoryId?: { name?: string } | unknown;
+}) {
+  return {
+    "Claim ID": c.claimId,
+    Employee: (c.employeeId as { name?: string })?.name || "",
+    Event: (c.eventId as { name?: string })?.name || "",
+    Category: (c.categoryId as { name?: string })?.name || "",
+    Amount: c.amount,
+    Status: formatStatus(c.status),
+    "Claim Date": new Date(c.claimDate).toISOString().split("T")[0],
+    Reason: c.reason || "",
+  };
+}
+
+async function fetchClaimRows(filter: Record<string, unknown> = {}) {
+  const claims = await Claim.find(filter)
+    .populate("employeeId", "name")
+    .populate("eventId", "name")
+    .populate("categoryId", "name")
+    .sort({ createdAt: -1 })
+    .lean();
+
+  return claims.map((c) => formatClaimRow(c));
+}
 
 export async function GET(request: Request) {
   try {
@@ -23,41 +57,24 @@ export async function GET(request: Request) {
     const eventId = searchParams.get("eventId");
     const employeeId = searchParams.get("employeeId");
     const format = searchParams.get("format");
+    const detail = searchParams.get("detail") === "true";
 
     let rows: Record<string, unknown>[] = [];
 
-    if (type === "event" && eventId) {
-      const event = await Event.findById(eventId).lean();
-      const claims = await Claim.find({ eventId })
-        .populate("employeeId", "name")
-        .populate("categoryId", "name")
-        .lean();
-
-      rows = claims.map((c) => ({
-        "Claim ID": c.claimId,
-        Employee: (c.employeeId as { name?: string })?.name,
-        Amount: c.amount,
-        Status: c.status,
-        Category: (c.categoryId as { name?: string })?.name,
-        "Claim Date": new Date(c.claimDate).toISOString().split("T")[0],
-        Event: event?.name,
-      }));
-    } else if (type === "employee" && employeeId) {
-      const user = await User.findById(employeeId).lean();
-      const claims = await Claim.find({ employeeId })
-        .populate("eventId", "name")
-        .populate("categoryId", "name")
-        .lean();
-
-      rows = claims.map((c) => ({
-        "Claim ID": c.claimId,
-        Employee: user?.name,
-        Amount: c.amount,
-        Status: c.status,
-        Event: (c.eventId as { name?: string })?.name,
-        Category: (c.categoryId as { name?: string })?.name,
-        "Claim Date": new Date(c.claimDate).toISOString().split("T")[0],
-      }));
+    if (type === "event") {
+      if (!eventId) {
+        if (format) return jsonError("Event is required for export", 400);
+        return jsonOk({ rows: [] });
+      }
+      rows = await fetchClaimRows({ eventId });
+    } else if (type === "employee") {
+      if (!employeeId) {
+        if (format) return jsonError("Employee is required for export", 400);
+        return jsonOk({ rows: [] });
+      }
+      rows = await fetchClaimRows({ employeeId });
+    } else if (detail || format) {
+      rows = await fetchClaimRows();
     } else {
       const [claims, events, users, batches] = await Promise.all([
         Claim.countDocuments(),
@@ -74,31 +91,23 @@ export async function GET(request: Request) {
         { $group: { _id: null, total: { $sum: "$amount" } } },
       ]);
 
-      if (format) {
-        rows = statusAgg.map((s) => ({
-          Status: s._id,
-          Count: s.count,
-          "Total Amount": s.total,
-        }));
-      } else {
-        return jsonOk({
-          summary: {
-            totalClaims: claims,
-            totalEvents: events,
-            totalEmployees: users,
-            totalBatches: batches,
-            totalAmount: amountAgg[0]?.total || 0,
-            byStatus: statusAgg,
-          },
-        });
-      }
+      return jsonOk({
+        summary: {
+          totalClaims: claims,
+          totalEvents: events,
+          totalEmployees: users,
+          totalBatches: batches,
+          totalAmount: amountAgg[0]?.total || 0,
+          byStatus: statusAgg,
+        },
+      });
     }
 
     if (format === "csv") {
       const csv = await rowsToCsv(rows);
       return new NextResponse(csv, {
         headers: {
-          "Content-Type": "text/csv",
+          "Content-Type": "text/csv; charset=utf-8",
           "Content-Disposition": `attachment; filename="report-${type}.csv"`,
         },
       });
@@ -106,7 +115,7 @@ export async function GET(request: Request) {
 
     if (format === "xlsx") {
       const buffer = await rowsToExcelBuffer(rows, "Report");
-      return new NextResponse(buffer, {
+      return new NextResponse(new Uint8Array(buffer), {
         headers: {
           "Content-Type":
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -115,7 +124,7 @@ export async function GET(request: Request) {
       });
     }
 
-    return jsonOk({ rows });
+    return jsonOk({ rows, total: rows.length });
   } catch (error) {
     return handleApiError(error);
   }
