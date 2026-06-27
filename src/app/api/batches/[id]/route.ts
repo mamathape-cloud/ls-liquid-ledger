@@ -1,5 +1,6 @@
 import { connectDB } from "@/lib/db";
 import { ApprovalBatch } from "@/models/ApprovalBatch";
+import { Category } from "@/models/Category";
 import { Claim } from "@/models/Claim";
 import { requireRoles } from "@/lib/auth";
 import { jsonOk, jsonError, handleApiError } from "@/lib/api";

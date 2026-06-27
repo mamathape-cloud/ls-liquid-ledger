@@ -1,5 +1,6 @@
 import { connectDB } from "@/lib/db";
 import { Claim } from "@/models/Claim";
+import { Category } from "@/models/Category";
 import { Event } from "@/models/Event";
 import { User } from "@/models/User";
 import { ApprovalBatch } from "@/models/ApprovalBatch";
