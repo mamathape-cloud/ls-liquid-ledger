@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { userCreateSchema, userUpdateSchema } from "@/lib/validators";
@@ -15,14 +15,23 @@ import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ROLES } from "@/lib/constants";
 import { useAuth } from "@/hooks/useAuth";
+import { PageHeader } from "@/components/layout/ThunderModules";
 import { formatStatus } from "@/lib/utils";
+import { canManageRole } from "@/lib/auth-client";
 
 type UserForm = z.infer<typeof userCreateSchema>;
 type UserEditForm = z.infer<typeof userUpdateSchema>;
 
+interface RoleOption {
+  _id: string;
+  name: string;
+  slug: string;
+}
+
 export default function AdminUsersPage() {
   const { user } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [roles, setRoles] = useState<RoleOption[]>([]);
   const [formError, setFormError] = useState("");
   const [editUser, setEditUser] = useState<Record<string, unknown> | null>(null);
   const [deleteUser, setDeleteUser] = useState<Record<string, unknown> | null>(null);
@@ -33,6 +42,12 @@ export default function AdminUsersPage() {
   } | null>(null);
   const [editError, setEditError] = useState("");
 
+  useEffect(() => {
+    fetch("/api/roles?active=true&limit=100")
+      .then((r) => r.json())
+      .then((d) => setRoles(d.data || []));
+  }, []);
+
   const {
     register,
     handleSubmit,
@@ -40,17 +55,16 @@ export default function AdminUsersPage() {
     formState: { errors, isSubmitting },
   } = useForm<UserForm>({
     resolver: zodResolver(userCreateSchema),
-    defaultValues: { role: ROLES.EMPLOYEE, status: "ACTIVE" },
+    defaultValues: { roleSlug: ROLES.EMPLOYEE, status: "ACTIVE" },
   });
 
   const editForm = useForm<UserEditForm>({
     resolver: zodResolver(userUpdateSchema),
   });
 
-  const allowedRoles =
-    user?.role === ROLES.SYSTEM_ADMIN
-      ? Object.values(ROLES)
-      : [ROLES.DIRECTOR, ROLES.EMPLOYEE];
+  const allowedRoles = roles.filter((r) =>
+    user ? canManageRole(user.roleSlug, r.slug) : false
+  );
 
   const onSubmit = async (data: UserForm) => {
     setFormError("");
@@ -64,7 +78,7 @@ export default function AdminUsersPage() {
       setFormError(json.message || "Failed to create user");
       return;
     }
-    reset();
+    reset({ roleSlug: ROLES.EMPLOYEE, status: "ACTIVE" });
     setRefreshKey((k) => k + 1);
   };
 
@@ -73,7 +87,7 @@ export default function AdminUsersPage() {
     setEditUser(row);
     editForm.reset({
       name: String(row.name),
-      role: row.role as UserEditForm["role"],
+      roleSlug: String(row.roleSlug || row.role),
       status: row.status as UserEditForm["status"],
     });
   };
@@ -102,9 +116,9 @@ export default function AdminUsersPage() {
     const json = await res.json();
     if (res.ok) {
       setResetResult({
-        name: json.name,
-        phone: json.phone,
-        newPassword: json.newPassword,
+        name: json.user?.name || String(row.name),
+        phone: json.user?.phone || String(row.phone),
+        newPassword: json.user?.newPassword,
       });
     }
   };
@@ -116,9 +130,11 @@ export default function AdminUsersPage() {
     setRefreshKey((k) => k + 1);
   };
 
+  const isSystemAdmin = user?.roleSlug === ROLES.SYSTEM_ADMIN;
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">User Management</h1>
+      <PageHeader title="User Management" />
 
       <Card>
         <h2 className="mb-4 font-semibold">Create User</h2>
@@ -140,9 +156,9 @@ export default function AdminUsersPage() {
           </div>
           <div>
             <Label>Role</Label>
-            <Select {...register("role")}>
+            <Select {...register("roleSlug")}>
               {allowedRoles.map((r) => (
-                <option key={r} value={r}>{formatStatus(r)}</option>
+                <option key={r.slug} value={r.slug}>{r.name}</option>
               ))}
             </Select>
           </div>
@@ -160,9 +176,9 @@ export default function AdminUsersPage() {
           refreshKey={refreshKey}
           filters={[
             {
-              key: "role",
+              key: "roleSlug",
               label: "All Roles",
-              options: Object.values(ROLES).map((r) => ({ label: formatStatus(r), value: r })),
+              options: roles.map((r) => ({ label: r.name, value: r.slug })),
             },
             {
               key: "status",
@@ -176,7 +192,7 @@ export default function AdminUsersPage() {
           columns={[
             { key: "name", header: "Name" },
             { key: "phone", header: "Phone" },
-            { key: "role", header: "Role", render: (r) => formatStatus(String(r.role)) },
+            { key: "roleSlug", header: "Role", render: (r) => formatStatus(String(r.roleSlug || r.role)) },
             { key: "status", header: "Status" },
             {
               key: "actions",
@@ -186,12 +202,12 @@ export default function AdminUsersPage() {
                   <Button variant="secondary" onClick={(e) => { e.stopPropagation(); openEdit(r); }}>
                     Edit
                   </Button>
-                  {user?.role === ROLES.SYSTEM_ADMIN && (
+                  {isSystemAdmin && (
                     <Button variant="secondary" onClick={(e) => { e.stopPropagation(); resetPassword(r); }}>
                       Reset Password
                     </Button>
                   )}
-                  {user?.role === ROLES.SYSTEM_ADMIN && (
+                  {isSystemAdmin && (
                     <Button variant="danger" onClick={(e) => { e.stopPropagation(); setDeleteUser(r); }}>
                       Delete
                     </Button>
@@ -214,9 +230,9 @@ export default function AdminUsersPage() {
           </div>
           <div>
             <Label>Role</Label>
-            <Select {...editForm.register("role")}>
+            <Select {...editForm.register("roleSlug")}>
               {allowedRoles.map((r) => (
-                <option key={r} value={r}>{formatStatus(r)}</option>
+                <option key={r.slug} value={r.slug}>{r.name}</option>
               ))}
             </Select>
           </div>

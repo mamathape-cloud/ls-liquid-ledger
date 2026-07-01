@@ -1,4 +1,4 @@
-import type { Role, ClaimStatus, BatchStatus } from "@/lib/constants";
+import type { ClaimStatus, BatchStatus } from "@/lib/constants";
 
 export interface BankDetails {
   upiId?: string;
@@ -11,7 +11,8 @@ export interface SessionUser {
   id: string;
   phone: string;
   name: string;
-  role: Role;
+  roleSlug: string;
+  permissions: string[];
 }
 
 export interface PaginationMeta {
@@ -60,4 +61,17 @@ export interface BatchListItem {
   status: BatchStatus;
   submittedAt?: string;
   createdAt: string;
+}
+
+export interface ExpenseHead {
+  name: string;
+  amount?: number;
+  subHeads: { name: string; amount: number }[];
+}
+
+export interface EventExpensePlanView {
+  _id: string;
+  eventId: string;
+  eventName?: string;
+  heads: ExpenseHead[];
 }

@@ -97,7 +97,7 @@ export function PageHeader({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="mb-5 flex items-center justify-between gap-3">
+    <div className="mb-5 flex min-w-0 flex-wrap items-center justify-between gap-3">
       <div className="flex min-w-0 items-center gap-3">
         <Link
           href={backHref}

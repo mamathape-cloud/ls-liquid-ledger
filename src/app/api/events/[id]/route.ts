@@ -1,21 +1,15 @@
 import { connectDB } from "@/lib/db";
 import { Event } from "@/models/Event";
-import { requireRoles } from "@/lib/auth";
+import { requireModule, requireAnyModule } from "@/lib/auth";
 import { eventSchema } from "@/lib/validators";
 import { jsonOk, jsonError, handleApiError } from "@/lib/api";
-import { ROLES } from "@/lib/constants";
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireRoles([
-      ROLES.FINANCE,
-      ROLES.EMPLOYEE,
-      ROLES.DIRECTOR,
-      ROLES.SYSTEM_ADMIN,
-    ]);
+    await requireAnyModule(["events", "my_claims", "event_expenses", "review_claims", "batches", "director_batches"]);
     const { id } = await params;
     await connectDB();
 
@@ -36,7 +30,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireRoles([ROLES.FINANCE]);
+    await requireModule("events");
     const { id } = await params;
     const body = await request.json();
     const parsed = eventSchema.partial().safeParse(body);

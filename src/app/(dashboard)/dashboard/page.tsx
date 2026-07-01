@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { getNavForRole } from "@/lib/navigation";
+import { getNavForPermissions } from "@/lib/navigation";
 import { ModuleGrid, WelcomeBanner } from "@/components/layout/ThunderModules";
 import { Input } from "@/components/ui/Input";
 
@@ -19,7 +19,7 @@ export default function DashboardPage() {
 
   if (!user) return null;
 
-  const nav = getNavForRole(user.role).filter((item) => item.href !== "/dashboard");
+  const nav = getNavForPermissions(user.permissions || []).filter((item) => item.href !== "/dashboard");
   const filtered = search.trim()
     ? nav.filter(
         (item) =>

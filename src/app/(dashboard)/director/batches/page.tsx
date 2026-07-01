@@ -11,6 +11,7 @@ import { ProofLinks } from "@/components/ProofLinks";
 import { ClaimStatusCell } from "@/components/ClaimStatusCell";
 import { formatINR, formatDate, formatStatus } from "@/lib/utils";
 import { BATCH_STATUSES } from "@/lib/constants";
+import { PageHeader } from "@/components/layout/ThunderModules";
 
 interface BatchClaim {
   _id: string;
@@ -107,7 +108,7 @@ export default function DirectorBatchesPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Batches</h1>
+      <PageHeader title="Director Batches" />
       <Card>
         <DataTable
           endpoint="/api/batches"

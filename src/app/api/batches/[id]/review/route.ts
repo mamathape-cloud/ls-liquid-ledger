@@ -1,8 +1,7 @@
 import { connectDB } from "@/lib/db";
 import { ApprovalBatch } from "@/models/ApprovalBatch";
 import { Claim } from "@/models/Claim";
-import { User } from "@/models/User";
-import { requireRoles } from "@/lib/auth";
+import { requireModule, getUserIdsWithModule } from "@/lib/auth";
 import { batchClaimReviewSchema } from "@/lib/validators";
 import { sendNotifications } from "@/lib/notifications";
 import { jsonOk, jsonError, handleApiError } from "@/lib/api";
@@ -17,7 +16,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await requireRoles([ROLES.DIRECTOR]);
+    const session = await requireModule("director_batches");
     const { id } = await params;
     const body = await request.json();
     const parsed = batchClaimReviewSchema.safeParse(body);
@@ -108,10 +107,7 @@ export async function POST(
       );
     }
 
-    const financeUsers = await User.find({
-      role: ROLES.FINANCE,
-      status: "ACTIVE",
-    }).select("_id");
+    const financeUserIds = await getUserIdsWithModule("disburse");
 
     const notifType =
       batch.status === BATCH_STATUSES.DIRECTOR_APPROVED
@@ -124,8 +120,8 @@ export async function POST(
         : `Batch ${batch.batchId} was rejected: ${parsed.data.rejectionReason}`;
 
     await sendNotifications(
-      financeUsers.map((u) => ({
-        userId: u._id.toString(),
+      financeUserIds.map((userId) => ({
+        userId,
         type: notifType,
         title:
           batch.status === BATCH_STATUSES.DIRECTOR_APPROVED

@@ -1,7 +1,7 @@
 import { connectDB } from "@/lib/db";
 import { Claim } from "@/models/Claim";
 import { User } from "@/models/User";
-import { requireRoles } from "@/lib/auth";
+import { requireModule } from "@/lib/auth";
 import { claimReviewSchema } from "@/lib/validators";
 import { sendNotification } from "@/lib/notifications";
 import { jsonOk, jsonError, handleApiError } from "@/lib/api";
@@ -12,7 +12,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await requireRoles([ROLES.FINANCE]);
+    const session = await requireModule("review_claims");
     const { id } = await params;
     const body = await request.json();
     const parsed = claimReviewSchema.safeParse(body);

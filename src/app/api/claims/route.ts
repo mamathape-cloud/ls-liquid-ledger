@@ -3,7 +3,7 @@ import { Claim } from "@/models/Claim";
 import { Event } from "@/models/Event";
 import { Category } from "@/models/Category";
 import { User } from "@/models/User";
-import { requireAuth, requireRoles } from "@/lib/auth";
+import { requireAuth, requireModule, getUserIdsWithModule } from "@/lib/auth";
 import { getStorageProvider } from "@/lib/storage";
 import { sendNotifications } from "@/lib/notifications";
 import { parseListQuery, buildTextSearch, paginateMeta } from "@/lib/pagination";
@@ -39,7 +39,7 @@ export async function GET(request: Request) {
       query.batchId = { $exists: false };
     }
 
-    if (session.role === ROLES.EMPLOYEE) {
+    if (session.roleSlug === ROLES.EMPLOYEE) {
       query.employeeId = session.id;
     }
 
@@ -85,7 +85,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const session = await requireRoles([ROLES.EMPLOYEE]);
+    const session = await requireModule("my_claims");
     const formData = await request.formData();
 
     const eventId = String(formData.get("eventId") || "");
@@ -161,14 +161,11 @@ export async function POST(request: Request) {
       status: CLAIM_STATUSES.SUBMITTED,
     });
 
-    const financeUsers = await User.find({
-      role: ROLES.FINANCE,
-      status: "ACTIVE",
-    }).select("_id");
+    const financeUserIds = await getUserIdsWithModule("review_claims");
 
     await sendNotifications(
-      financeUsers.map((u) => ({
-        userId: u._id.toString(),
+      financeUserIds.map((userId) => ({
+        userId,
         type: "CLAIM_SUBMITTED",
         title: "New claim submitted",
         message: `${session.name} submitted claim ${claimId} for review.`,

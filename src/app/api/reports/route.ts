@@ -4,8 +4,10 @@ import { Category } from "@/models/Category";
 import { Event } from "@/models/Event";
 import { User } from "@/models/User";
 import { ApprovalBatch } from "@/models/ApprovalBatch";
-import { requireRoles } from "@/lib/auth";
+import { EventExpensePlan } from "@/models/EventExpensePlan";
+import { requireModule, hasModule } from "@/lib/auth";
 import { rowsToCsv, rowsToExcelBuffer } from "@/lib/export";
+import { flattenExpensePlanRows } from "@/lib/event-expenses";
 import { jsonOk, jsonError, handleApiError } from "@/lib/api";
 import { formatStatus } from "@/lib/utils";
 import { ROLES } from "@/lib/constants";
@@ -22,10 +24,13 @@ function formatClaimRow(c: {
   categoryId?: { name?: string } | unknown;
 }) {
   return {
+    Type: "Claim",
     "Claim ID": c.claimId,
     Employee: (c.employeeId as { name?: string })?.name || "",
     Event: (c.eventId as { name?: string })?.name || "",
     Category: (c.categoryId as { name?: string })?.name || "",
+    Head: "",
+    "Sub-Head": "",
     Amount: c.amount,
     Status: formatStatus(c.status),
     "Claim Date": new Date(c.claimDate).toISOString().split("T")[0],
@@ -44,13 +49,19 @@ async function fetchClaimRows(filter: Record<string, unknown> = {}) {
   return claims.map((c) => formatClaimRow(c));
 }
 
+async function fetchEventExpenseRows(eventId: string) {
+  const event = await Event.findById(eventId).select("name").lean();
+  if (!event) return [];
+
+  const plan = await EventExpensePlan.findOne({ eventId }).lean();
+  if (!plan?.heads?.length) return [];
+
+  return flattenExpensePlanRows(event.name, plan.heads as Parameters<typeof flattenExpensePlanRows>[1]);
+}
+
 export async function GET(request: Request) {
   try {
-    await requireRoles([
-      ROLES.FINANCE,
-      ROLES.DIRECTOR,
-      ROLES.SYSTEM_ADMIN,
-    ]);
+    const session = await requireModule("reports");
     await connectDB();
 
     const { searchParams } = new URL(request.url);
@@ -59,15 +70,31 @@ export async function GET(request: Request) {
     const employeeId = searchParams.get("employeeId");
     const format = searchParams.get("format");
     const detail = searchParams.get("detail") === "true";
+    const expenseView = searchParams.get("expenseView") || "claims";
+    const canViewEventExpenses = hasModule(session, "event_expenses");
 
     let rows: Record<string, unknown>[] = [];
 
     if (type === "event") {
       if (!eventId) {
         if (format) return jsonError("Event is required for export", 400);
-        return jsonOk({ rows: [] });
+        return jsonOk({ rows: [], canViewEventExpenses });
       }
-      rows = await fetchClaimRows({ eventId });
+
+      const claimRows = await fetchClaimRows({ eventId });
+      const effectiveView =
+        !canViewEventExpenses || expenseView === "claims"
+          ? "claims"
+          : expenseView;
+
+      if (effectiveView === "claims") {
+        rows = claimRows;
+      } else if (effectiveView === "other_expenses") {
+        rows = await fetchEventExpenseRows(eventId);
+      } else {
+        const expenseRows = await fetchEventExpenseRows(eventId);
+        rows = [...claimRows, ...expenseRows];
+      }
     } else if (type === "employee") {
       if (!employeeId) {
         if (format) return jsonError("Employee is required for export", 400);
@@ -80,7 +107,7 @@ export async function GET(request: Request) {
       const [claims, events, users, batches] = await Promise.all([
         Claim.countDocuments(),
         Event.countDocuments(),
-        User.countDocuments({ role: ROLES.EMPLOYEE }),
+        User.countDocuments({ roleSlug: ROLES.EMPLOYEE }),
         ApprovalBatch.countDocuments(),
       ]);
 
@@ -101,6 +128,7 @@ export async function GET(request: Request) {
           totalAmount: amountAgg[0]?.total || 0,
           byStatus: statusAgg,
         },
+        canViewEventExpenses,
       });
     }
 
@@ -125,7 +153,7 @@ export async function GET(request: Request) {
       });
     }
 
-    return jsonOk({ rows, total: rows.length });
+    return jsonOk({ rows, total: rows.length, canViewEventExpenses });
   } catch (error) {
     return handleApiError(error);
   }

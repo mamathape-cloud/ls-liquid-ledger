@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/Label";
 import { Button } from "@/components/ui/Button";
 import { ProofLinks } from "@/components/ProofLinks";
 import { ClaimStatusCell } from "@/components/ClaimStatusCell";
+import { PageHeader } from "@/components/layout/ThunderModules";
 import { formatINR, formatDate } from "@/lib/utils";
 
 export default function SearchPage() {
@@ -23,7 +24,7 @@ export default function SearchPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Track Claim</h1>
+      <PageHeader title="Track Claim" />
       <Card>
         <div className="flex flex-wrap items-end gap-4">
           <div className="min-w-[280px] flex-1">

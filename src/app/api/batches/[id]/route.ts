@@ -2,7 +2,7 @@ import { connectDB } from "@/lib/db";
 import { ApprovalBatch } from "@/models/ApprovalBatch";
 import { Category } from "@/models/Category";
 import { Claim } from "@/models/Claim";
-import { requireRoles } from "@/lib/auth";
+import { requireModule, requireAnyModule } from "@/lib/auth";
 import { jsonOk, jsonError, handleApiError } from "@/lib/api";
 import { ROLES } from "@/lib/constants";
 
@@ -11,7 +11,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireRoles([ROLES.FINANCE, ROLES.DIRECTOR, ROLES.SYSTEM_ADMIN]);
+    await requireAnyModule(["batches", "director_batches"]);
     const { id } = await params;
     await connectDB();
 

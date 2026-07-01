@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ROLES, BUDGET_TYPES } from "@/lib/constants";
+import { BUDGET_TYPES } from "@/lib/constants";
 import { normalizePhone } from "@/lib/utils";
 
 const phoneSchema = z
@@ -21,22 +21,47 @@ export const userCreateSchema = z.object({
   phone: phoneSchema,
   password: passwordSchema,
   name: z.string().min(2, "Name must be at least 2 characters"),
-  role: z.enum([
-    ROLES.SYSTEM_ADMIN,
-    ROLES.FINANCE,
-    ROLES.DIRECTOR,
-    ROLES.EMPLOYEE,
-  ]),
+  roleSlug: z.string().min(1, "Role is required"),
   status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
 });
 
 export const userUpdateSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").optional(),
-  role: z
-    .enum([ROLES.SYSTEM_ADMIN, ROLES.FINANCE, ROLES.DIRECTOR, ROLES.EMPLOYEE])
-    .optional(),
+  roleSlug: z.string().min(1).optional(),
   status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
   password: passwordSchema.optional(),
+});
+
+export const roleCreateSchema = z.object({
+  name: z.string().min(2, "Role name must be at least 2 characters"),
+  slug: z
+    .string()
+    .min(2, "Slug is required")
+    .regex(/^[A-Z0-9_]+$/, "Use uppercase letters, numbers, and underscores"),
+  modules: z.array(z.string()).min(1, "Select at least one module"),
+  active: z.boolean().optional(),
+});
+
+export const roleUpdateSchema = z.object({
+  name: z.string().min(2).optional(),
+  modules: z.array(z.string()).min(1).optional(),
+  active: z.boolean().optional(),
+});
+
+const subHeadSchema = z.object({
+  name: z.string().min(1, "Sub-head name is required"),
+  amount: z.coerce.number().min(0, "Amount must be 0 or more"),
+});
+
+const expenseHeadSchema = z.object({
+  name: z.string().min(1, "Head name is required"),
+  amount: z.coerce.number().min(0).optional(),
+  subHeads: z.array(subHeadSchema).default([]),
+});
+
+export const eventExpensePlanSchema = z.object({
+  eventId: z.string().min(1, "Event is required"),
+  heads: z.array(expenseHeadSchema),
 });
 
 export const bankDetailsSchema = z

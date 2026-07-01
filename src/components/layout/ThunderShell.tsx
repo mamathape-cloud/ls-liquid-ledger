@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getNavForRole, getBottomNavForRole, type NavItem } from "@/lib/navigation";
+import { getNavForPermissions, getBottomNavForPermissions, type NavItem } from "@/lib/navigation";
 import { NavIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import type { SessionUser } from "@/types";
@@ -20,8 +20,9 @@ export function ThunderShell({ user, children }: ThunderShellProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  const allNav = getNavForRole(user.role);
-  const bottomNav = getBottomNavForRole(user.role);
+  const permissions = user.permissions || [];
+  const allNav = getNavForPermissions(permissions);
+  const bottomNav = getBottomNavForPermissions(permissions, user.roleSlug);
   const isDashboard = pathname === "/dashboard";
 
   useEffect(() => {
@@ -49,8 +50,8 @@ export function ThunderShell({ user, children }: ThunderShellProps) {
   };
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-lg flex-col bg-[var(--background)] lg:max-w-6xl">
-      <header className="sticky top-0 z-30 border-b border-[var(--border)] bg-white/95 px-4 py-3 backdrop-blur">
+    <div className="mx-auto flex min-h-screen w-full max-w-lg flex-col overflow-x-hidden bg-[var(--background)] lg:max-w-6xl">
+      <header className="sticky top-0 z-30 shrink-0 border-b border-[var(--border)] bg-white/95 px-4 py-3 backdrop-blur">
         <div className="flex items-center justify-between gap-3">
           <Link href="/dashboard" className="min-w-0">
             <Image
@@ -88,7 +89,7 @@ export function ThunderShell({ user, children }: ThunderShellProps) {
         </div>
       </header>
 
-      <main className={cn("flex-1 px-4 py-4 sm:px-6", !isDashboard && "pb-4")}>
+      <main className={cn("min-w-0 flex-1 max-w-full px-4 py-4 sm:px-6", !isDashboard && "pb-4")}>
         {children}
       </main>
 
@@ -114,14 +115,14 @@ export function ThunderShell({ user, children }: ThunderShellProps) {
       {menuOpen && (
         <div className="fixed inset-0 z-50">
           <button type="button" className="absolute inset-0 bg-black/40" onClick={() => setMenuOpen(false)} aria-label="Close menu" />
-          <div className="absolute bottom-0 left-0 right-0 max-h-[80vh] overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl lg:left-auto lg:right-4 lg:top-4 lg:bottom-4 lg:max-h-none lg:w-80 lg:rounded-2xl">
+          <div className="absolute left-0 right-0 top-0 max-h-[85vh] overflow-y-auto rounded-b-3xl bg-white p-5 pt-[max(1.25rem,env(safe-area-inset-top))] shadow-2xl lg:left-auto lg:right-4 lg:top-4 lg:max-h-none lg:w-80 lg:rounded-2xl lg:pt-5">
             <div className="mb-4 flex items-center gap-3 border-b border-[var(--border)] pb-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--primary-soft)] text-lg font-bold text-[var(--primary)]">
                 {user.name.charAt(0).toUpperCase()}
               </div>
               <div>
                 <p className="font-semibold text-slate-900">{user.name}</p>
-                <p className="text-xs text-slate-500">{user.role.replace(/_/g, " ")}</p>
+                <p className="text-xs text-slate-500">{user.roleSlug.replace(/_/g, " ")}</p>
               </div>
             </div>
             <div className="grid gap-1">

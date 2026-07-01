@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { ProofLinks } from "@/components/ProofLinks";
 import { formatINR, formatDate, formatStatus } from "@/lib/utils";
 import { CLAIM_STATUSES } from "@/lib/constants";
+import { PageHeader } from "@/components/layout/ThunderModules";
 
 export default function FinanceDisbursePage() {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -48,7 +49,7 @@ export default function FinanceDisbursePage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Disburse Payments</h1>
+      <PageHeader title="Disburse Payments" />
       <Card>
         <p className="mb-4 text-sm text-slate-500">
           Select director-approved claims and mark them as disbursed after payment is processed.

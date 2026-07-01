@@ -1,7 +1,9 @@
 import { connectDB } from "@/lib/db";
 import { User } from "@/models/User";
+import { Role } from "@/models/Role";
 import {
-  requireRoles,
+  requireModule,
+  requireAnyModule,
   hashPassword,
   canManageRole,
 } from "@/lib/auth";
@@ -13,11 +15,7 @@ import { normalizePhone } from "@/lib/utils";
 
 export async function GET(request: Request) {
   try {
-    const session = await requireRoles([
-      ROLES.SYSTEM_ADMIN,
-      ROLES.FINANCE,
-      ROLES.DIRECTOR,
-    ]);
+    const session = await requireAnyModule(["users", "reports", "events"]);
     await connectDB();
 
     const { searchParams } = new URL(request.url);
@@ -27,11 +25,12 @@ export async function GET(request: Request) {
       ...buildTextSearch(search, ["name", "phone"]),
     };
 
-    if (filters.role) query.role = filters.role;
+    if (filters.roleSlug) query.roleSlug = String(filters.roleSlug).toUpperCase();
+    if (filters.role) query.roleSlug = String(filters.role).toUpperCase();
     if (filters.status) query.status = filters.status;
 
-    if (session.role === ROLES.DIRECTOR) {
-      query.role = ROLES.EMPLOYEE;
+    if (session.roleSlug === ROLES.DIRECTOR) {
+      query.roleSlug = ROLES.EMPLOYEE;
       query.status = "ACTIVE";
     }
 
@@ -61,10 +60,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const session = await requireRoles([
-      ROLES.SYSTEM_ADMIN,
-      ROLES.FINANCE,
-    ]);
+    const session = await requireModule("users");
     const body = await request.json();
     const parsed = userCreateSchema.safeParse(body);
 
@@ -72,11 +68,19 @@ export async function POST(request: Request) {
       return jsonError("Validation failed", 400, parsed.error.flatten());
     }
 
-    if (!canManageRole(session.role, parsed.data.role)) {
+    const roleSlug = parsed.data.roleSlug.toUpperCase();
+
+    if (!canManageRole(session.roleSlug, roleSlug)) {
       return jsonError("You cannot create users with this role", 403);
     }
 
     await connectDB();
+
+    const role = await Role.findOne({ slug: roleSlug, active: true });
+    if (!role) {
+      return jsonError("Invalid or inactive role", 400);
+    }
+
     const phone = normalizePhone(parsed.data.phone);
     const exists = await User.findOne({ phone });
     if (exists) {
@@ -88,7 +92,7 @@ export async function POST(request: Request) {
       phone,
       passwordHash,
       name: parsed.data.name,
-      role: parsed.data.role,
+      roleSlug,
       status: parsed.data.status || "ACTIVE",
       createdBy: session.id,
     });
@@ -99,7 +103,7 @@ export async function POST(request: Request) {
           _id: user._id.toString(),
           phone: user.phone,
           name: user.name,
-          role: user.role,
+          roleSlug: user.roleSlug,
           status: user.status,
         },
       },

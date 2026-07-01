@@ -4,9 +4,12 @@ import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import { connectDB } from "@/lib/db";
 import { User } from "@/models/User";
+import { Role } from "@/models/Role";
 import type { SessionUser } from "@/types";
-import type { Role } from "@/lib/constants";
+import { ROLES, type Role as RoleSlug } from "@/lib/constants";
 import { COOKIE_NAME } from "@/lib/auth-edge";
+import type { AppModuleKey } from "@/lib/modules";
+
 const MAX_AGE = 60 * 60 * 24 * 7;
 
 const JWT_SECRET = new TextEncoder().encode(
@@ -21,12 +24,35 @@ export async function verifyPassword(password: string, hash: string) {
   return bcrypt.compare(password, hash);
 }
 
+export async function getRolePermissions(roleSlug: string): Promise<string[]> {
+  await connectDB();
+  const role = await Role.findOne({ slug: roleSlug.toUpperCase(), active: true }).lean();
+  return role?.modules || [];
+}
+
+export async function buildSessionUser(user: {
+  _id: { toString(): string };
+  phone: string;
+  name: string;
+  roleSlug: string;
+}): Promise<SessionUser> {
+  const permissions = await getRolePermissions(user.roleSlug);
+  return {
+    id: user._id.toString(),
+    phone: user.phone,
+    name: user.name,
+    roleSlug: user.roleSlug,
+    permissions,
+  };
+}
+
 export async function createToken(user: SessionUser) {
   return new SignJWT({
     sub: user.id,
     phone: user.phone,
     name: user.name,
-    role: user.role,
+    roleSlug: user.roleSlug,
+    permissions: user.permissions,
   })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -40,7 +66,8 @@ export async function verifyToken(token: string) {
     id: payload.sub as string,
     phone: payload.phone as string,
     name: payload.name as string,
-    role: payload.role as Role,
+    roleSlug: (payload.roleSlug as string) || (payload.role as string),
+    permissions: (payload.permissions as string[]) || [],
   } satisfies SessionUser;
 }
 
@@ -87,9 +114,28 @@ export async function requireAuth(req?: NextRequest) {
   return session;
 }
 
-export async function requireRoles(roles: Role[], req?: NextRequest) {
+export async function requireRoles(roles: RoleSlug[], req?: NextRequest) {
   const session = await requireAuth(req);
-  if (!roles.includes(session.role)) {
+  if (!roles.includes(session.roleSlug as RoleSlug)) {
+    throw new Error("FORBIDDEN");
+  }
+  return session;
+}
+
+export async function requireModule(moduleKey: AppModuleKey, req?: NextRequest) {
+  const session = await requireAuth(req);
+  if (!session.permissions.includes(moduleKey)) {
+    throw new Error("FORBIDDEN");
+  }
+  return session;
+}
+
+export async function requireAnyModule(
+  moduleKeys: AppModuleKey[],
+  req?: NextRequest
+) {
+  const session = await requireAuth(req);
+  if (!moduleKeys.some((key) => session.permissions.includes(key))) {
     throw new Error("FORBIDDEN");
   }
   return session;
@@ -100,12 +146,27 @@ export async function getUserByPhone(phone: string) {
   return User.findOne({ phone });
 }
 
-export function canManageRole(actorRole: Role, targetRole: Role) {
-  if (actorRole === "SYSTEM_ADMIN") return true;
-  if (actorRole === "FINANCE") {
-    return targetRole === "DIRECTOR" || targetRole === "EMPLOYEE";
+export function canManageRole(actorRoleSlug: string, targetRoleSlug: string) {
+  if (actorRoleSlug === ROLES.SYSTEM_ADMIN) return true;
+  if (actorRoleSlug === ROLES.FINANCE) {
+    return targetRoleSlug === ROLES.DIRECTOR || targetRoleSlug === ROLES.EMPLOYEE;
   }
   return false;
+}
+
+export function hasModule(session: SessionUser, moduleKey: AppModuleKey) {
+  return session.permissions.includes(moduleKey);
+}
+
+export async function getUserIdsWithModule(moduleKey: AppModuleKey): Promise<string[]> {
+  await connectDB();
+  const roles = await Role.find({ active: true, modules: moduleKey }).select("slug").lean();
+  const slugs = roles.map((r) => r.slug);
+  if (!slugs.length) return [];
+  const users = await User.find({ roleSlug: { $in: slugs }, status: "ACTIVE" })
+    .select("_id")
+    .lean();
+  return users.map((u) => u._id.toString());
 }
 
 export { COOKIE_NAME };

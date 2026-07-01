@@ -1,6 +1,6 @@
 import { connectDB } from "@/lib/db";
 import { Category } from "@/models/Category";
-import { requireRoles } from "@/lib/auth";
+import { requireModule, requireAnyModule } from "@/lib/auth";
 import { categorySchema } from "@/lib/validators";
 import { parseListQuery, buildTextSearch, paginateMeta } from "@/lib/pagination";
 import { jsonOk, jsonError, handleApiError } from "@/lib/api";
@@ -8,12 +8,7 @@ import { ROLES } from "@/lib/constants";
 
 export async function GET(request: Request) {
   try {
-    const session = await requireRoles([
-      ROLES.SYSTEM_ADMIN,
-      ROLES.FINANCE,
-      ROLES.EMPLOYEE,
-      ROLES.DIRECTOR,
-    ]);
+    const session = await requireAnyModule(["categories", "my_claims", "review_claims"]);
     await connectDB();
 
     const { searchParams } = new URL(request.url);
@@ -23,7 +18,7 @@ export async function GET(request: Request) {
       ...buildTextSearch(search, ["name"]),
     };
 
-    if (session.role === ROLES.EMPLOYEE) {
+    if (session.roleSlug === ROLES.EMPLOYEE) {
       query.active = true;
     } else if (filters.active) {
       query.active = filters.active === "true";
@@ -46,7 +41,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const session = await requireRoles([ROLES.SYSTEM_ADMIN]);
+    const session = await requireModule("categories");
     const body = await request.json();
     const parsed = categorySchema.safeParse(body);
 

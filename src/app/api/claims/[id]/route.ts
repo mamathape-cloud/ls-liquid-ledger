@@ -2,7 +2,7 @@ import { connectDB } from "@/lib/db";
 import { Claim } from "@/models/Claim";
 import { Category } from "@/models/Category";
 import { Event } from "@/models/Event";
-import { requireAuth, requireRoles } from "@/lib/auth";
+import { requireAuth, requireModule } from "@/lib/auth";
 import { getStorageProvider } from "@/lib/storage";
 import { jsonOk, jsonError, handleApiError } from "@/lib/api";
 import { ROLES, CLAIM_STATUSES, ALLOWED_MIME_TYPES, MAX_FILE_SIZE } from "@/lib/constants";
@@ -39,7 +39,7 @@ export async function GET(
         ? (claim.employeeId as { _id: { toString: () => string } })._id.toString()
         : String(claim.employeeId);
 
-    if (session.role === ROLES.EMPLOYEE && employeeId !== session.id) {
+    if (session.roleSlug === ROLES.EMPLOYEE && employeeId !== session.id) {
       return jsonError("Forbidden", 403);
     }
 
@@ -54,7 +54,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await requireRoles([ROLES.EMPLOYEE]);
+    const session = await requireModule("my_claims");
     const { id } = await params;
     await connectDB();
 
@@ -131,7 +131,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await requireRoles([ROLES.EMPLOYEE]);
+    const session = await requireModule("my_claims");
     const { id } = await params;
     await connectDB();
 

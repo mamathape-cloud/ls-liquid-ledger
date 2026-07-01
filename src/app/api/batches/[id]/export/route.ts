@@ -1,7 +1,7 @@
 import { connectDB } from "@/lib/db";
 import { ApprovalBatch } from "@/models/ApprovalBatch";
 import { Claim } from "@/models/Claim";
-import { requireRoles } from "@/lib/auth";
+import { requireModule } from "@/lib/auth";
 import { rowsToExcelBuffer } from "@/lib/export";
 import { jsonError, handleApiError } from "@/lib/api";
 import { ROLES, BATCH_STATUSES } from "@/lib/constants";
@@ -12,7 +12,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireRoles([ROLES.FINANCE]);
+    await requireModule("batches");
     const { id } = await params;
     await connectDB();
 

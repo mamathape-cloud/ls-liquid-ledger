@@ -67,7 +67,7 @@ export default function FinanceEventsPage() {
   const watchedAssignments = watch("assignedEmployees");
 
   useEffect(() => {
-    fetch("/api/users?filter.role=EMPLOYEE&limit=100")
+    fetch("/api/users?filter.roleSlug=EMPLOYEE&limit=100")
       .then((r) => r.json())
       .then((d) => setEmployees(d.data || []));
   }, []);

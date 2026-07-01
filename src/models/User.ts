@@ -1,5 +1,4 @@
 import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
-import { ROLES } from "@/lib/constants";
 
 const BankDetailsSchema = new Schema(
   {
@@ -16,11 +15,7 @@ const UserSchema = new Schema(
     phone: { type: String, required: true, unique: true, trim: true },
     passwordHash: { type: String, required: true },
     name: { type: String, required: true, trim: true },
-    role: {
-      type: String,
-      enum: Object.values(ROLES),
-      required: true,
-    },
+    roleSlug: { type: String, required: true, trim: true, uppercase: true },
     status: {
       type: String,
       enum: ["ACTIVE", "INACTIVE"],
@@ -32,7 +27,7 @@ const UserSchema = new Schema(
   { timestamps: true }
 );
 
-UserSchema.index({ role: 1, status: 1 });
+UserSchema.index({ roleSlug: 1, status: 1 });
 UserSchema.index({ name: "text", phone: "text" });
 
 export type IUser = InferSchemaType<typeof UserSchema> & {

@@ -1,7 +1,7 @@
 import { connectDB } from "@/lib/db";
 import { Event } from "@/models/Event";
 import { User } from "@/models/User";
-import { requireRoles } from "@/lib/auth";
+import { requireModule, requireAnyModule } from "@/lib/auth";
 import { eventSchema } from "@/lib/validators";
 import { parseListQuery, buildTextSearch, paginateMeta } from "@/lib/pagination";
 import { jsonOk, jsonError, handleApiError } from "@/lib/api";
@@ -9,12 +9,7 @@ import { ROLES } from "@/lib/constants";
 
 export async function GET(request: Request) {
   try {
-    const session = await requireRoles([
-      ROLES.FINANCE,
-      ROLES.EMPLOYEE,
-      ROLES.DIRECTOR,
-      ROLES.SYSTEM_ADMIN,
-    ]);
+    const session = await requireAnyModule(["events", "my_claims", "event_expenses", "review_claims", "batches", "director_batches"]);
     await connectDB();
 
     const { searchParams } = new URL(request.url);
@@ -26,7 +21,7 @@ export async function GET(request: Request) {
 
     if (filters.status) query.status = filters.status;
 
-    if (session.role === ROLES.EMPLOYEE) {
+    if (session.roleSlug === ROLES.EMPLOYEE) {
       query["assignedEmployees.employeeId"] = session.id;
       query.status = "ACTIVE";
     }
@@ -61,7 +56,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const session = await requireRoles([ROLES.FINANCE]);
+    const session = await requireModule("events");
     const body = await request.json();
     const parsed = eventSchema.safeParse(body);
 
@@ -89,7 +84,7 @@ export async function POST(request: Request) {
 
     const employees = await User.find({
       _id: { $in: employeeIds },
-      role: ROLES.EMPLOYEE,
+      roleSlug: ROLES.EMPLOYEE,
       status: "ACTIVE",
     });
 
@@ -97,10 +92,10 @@ export async function POST(request: Request) {
       const foundIds = new Set(employees.map((e) => e._id.toString()));
       const missing = employeeIds.filter((id) => !foundIds.has(id));
       if (missing.length) {
-        const invalid = await User.find({ _id: { $in: missing } }).select("name role status");
+        const invalid = await User.find({ _id: { $in: missing } }).select("name roleSlug status");
         if (invalid.length) {
           const u = invalid[0];
-          if (u.role !== ROLES.EMPLOYEE) {
+          if (u.roleSlug !== ROLES.EMPLOYEE) {
             return jsonError(`${u.name} is not an employee and cannot be assigned to events`, 400);
           }
           if (u.status !== "ACTIVE") {

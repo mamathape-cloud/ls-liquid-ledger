@@ -1,16 +1,15 @@
 import { connectDB } from "@/lib/db";
 import { Category } from "@/models/Category";
-import { requireRoles } from "@/lib/auth";
+import { requireModule } from "@/lib/auth";
 import { categorySchema } from "@/lib/validators";
 import { jsonOk, jsonError, handleApiError } from "@/lib/api";
-import { ROLES } from "@/lib/constants";
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireRoles([ROLES.SYSTEM_ADMIN]);
+    await requireModule("categories");
     const { id } = await params;
     const body = await request.json();
     const parsed = categorySchema.partial().safeParse(body);
@@ -36,7 +35,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireRoles([ROLES.SYSTEM_ADMIN]);
+    await requireModule("categories");
     const { id } = await params;
 
     await connectDB();

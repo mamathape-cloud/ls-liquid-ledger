@@ -32,6 +32,149 @@ interface DataTableProps<T extends Record<string, unknown>> {
 
 const EMPTY_PARAMS: Record<string, string> = {};
 
+function renderCell<T extends Record<string, unknown>>(col: Column<T>, row: T) {
+  return col.render ? col.render(row) : String(row[col.key] ?? "");
+}
+
+function rowKey<T extends Record<string, unknown>>(row: T, idx: number) {
+  return String(row._id || row.id || idx);
+}
+
+interface DataRowsProps<T extends Record<string, unknown>> {
+  data: T[];
+  columns: Column<T>[];
+  onRowClick?: (row: T) => void;
+  showInitialLoading: boolean;
+  showEmpty: boolean;
+  refreshing: boolean;
+}
+
+function MobileCardList<T extends Record<string, unknown>>({
+  data,
+  columns,
+  onRowClick,
+  showInitialLoading,
+  showEmpty,
+  refreshing,
+}: DataRowsProps<T>) {
+  const dataColumns = columns.filter((c) => c.key !== "actions");
+  const actionColumn = columns.find((c) => c.key === "actions");
+
+  if (showInitialLoading) {
+    return (
+      <div className="rounded-2xl border border-[var(--border)] bg-white px-4 py-10 text-center text-sm text-slate-500 md:hidden">
+        Loading...
+      </div>
+    );
+  }
+
+  if (showEmpty) {
+    return (
+      <div className="rounded-2xl border border-[var(--border)] bg-white px-4 py-10 text-center text-sm text-slate-500 md:hidden">
+        No records found
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative space-y-3 md:hidden">
+      {refreshing && (
+        <div className="absolute right-0 top-0 z-10 rounded-lg bg-[var(--primary-soft)] px-2 py-1 text-xs text-[var(--primary)]">
+          Updating...
+        </div>
+      )}
+      {data.map((row, idx) => (
+        <div
+          key={rowKey(row, idx)}
+          className={`rounded-2xl border border-[var(--border)] bg-white p-4 shadow-sm ${
+            onRowClick ? "cursor-pointer active:bg-[var(--primary-soft)]/30" : ""
+          }`}
+          onClick={() => onRowClick?.(row)}
+        >
+          {dataColumns.map((col) => (
+            <div
+              key={col.key}
+              className="flex items-start justify-between gap-3 border-b border-[var(--border)] py-2.5 last:border-b-0"
+            >
+              <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                {col.header}
+              </span>
+              <span className="min-w-0 text-right text-sm text-slate-900">{renderCell(col, row)}</span>
+            </div>
+          ))}
+          {actionColumn?.render && (
+            <div
+              className="mt-3 flex flex-wrap gap-2 border-t border-[var(--border)] pt-3"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {actionColumn.render(row)}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DesktopTable<T extends Record<string, unknown>>({
+  data,
+  columns,
+  onRowClick,
+  showInitialLoading,
+  showEmpty,
+  refreshing,
+}: DataRowsProps<T>) {
+  return (
+    <div className="relative hidden overflow-x-auto rounded-2xl border border-[var(--border)] bg-white shadow-sm md:block">
+      {refreshing && (
+        <div className="absolute right-3 top-3 z-10 rounded-lg bg-[var(--primary-soft)] px-2 py-1 text-xs text-[var(--primary)]">
+          Updating...
+        </div>
+      )}
+      <table className="min-w-full text-sm">
+        <thead className="border-b border-[var(--border)] bg-[var(--surface-muted)] text-left text-xs uppercase tracking-wide text-slate-500">
+          <tr>
+            {columns.map((col) => (
+              <th key={col.key} className="whitespace-nowrap px-4 py-3 font-semibold">
+                {col.header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="text-slate-900">
+          {showInitialLoading ? (
+            <tr>
+              <td colSpan={columns.length} className="px-4 py-10 text-center text-slate-500">
+                Loading...
+              </td>
+            </tr>
+          ) : showEmpty ? (
+            <tr>
+              <td colSpan={columns.length} className="px-4 py-10 text-center text-slate-500">
+                No records found
+              </td>
+            </tr>
+          ) : (
+            data.map((row, idx) => (
+              <tr
+                key={rowKey(row, idx)}
+                className="border-t border-[var(--border)] transition hover:bg-[var(--primary-soft)]/40"
+                onClick={() => onRowClick?.(row)}
+              >
+                {columns.map((col) => (
+                  <td key={col.key} className="whitespace-nowrap px-4 py-3.5">
+                    {renderCell(col, row)}
+                  </td>
+                ))}
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function DataTable<T extends Record<string, unknown>>({
   endpoint,
   columns,
@@ -121,6 +264,15 @@ export function DataTable<T extends Record<string, unknown>>({
   const showInitialLoading = initialLoading && data.length === 0;
   const showEmpty = !showInitialLoading && !refreshing && data.length === 0;
 
+  const rowProps: DataRowsProps<T> = {
+    data,
+    columns,
+    onRowClick,
+    showInitialLoading,
+    showEmpty,
+    refreshing,
+  };
+
   return (
     <div className="space-y-4">
       <div className="rounded-2xl bg-[var(--surface-muted)] p-3 sm:p-4">
@@ -196,53 +348,8 @@ export function DataTable<T extends Record<string, unknown>>({
         )}
       </div>
 
-      <div className="relative overflow-x-auto rounded-2xl border border-[var(--border)] bg-white shadow-sm">
-        {refreshing && (
-          <div className="absolute right-3 top-3 z-10 rounded-lg bg-[var(--primary-soft)] px-2 py-1 text-xs text-[var(--primary)]">
-            Updating...
-          </div>
-        )}
-        <table className="min-w-full text-sm">
-          <thead className="border-b border-[var(--border)] bg-[var(--surface-muted)] text-left text-xs uppercase tracking-wide text-slate-500">
-            <tr>
-              {columns.map((col) => (
-                <th key={col.key} className="whitespace-nowrap px-4 py-3 font-semibold">
-                  {col.header}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="text-slate-900">
-            {showInitialLoading ? (
-              <tr>
-                <td colSpan={columns.length} className="px-4 py-10 text-center text-slate-500">
-                  Loading...
-                </td>
-              </tr>
-            ) : showEmpty ? (
-              <tr>
-                <td colSpan={columns.length} className="px-4 py-10 text-center text-slate-500">
-                  No records found
-                </td>
-              </tr>
-            ) : (
-              data.map((row, idx) => (
-                <tr
-                  key={String(row._id || row.id || idx)}
-                  className="border-t border-[var(--border)] transition hover:bg-[var(--primary-soft)]/40"
-                  onClick={() => onRowClick?.(row)}
-                >
-                  {columns.map((col) => (
-                    <td key={col.key} className="whitespace-nowrap px-4 py-3.5">
-                      {col.render ? col.render(row) : String(row[col.key] ?? "")}
-                    </td>
-                  ))}
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <MobileCardList {...rowProps} />
+      <DesktopTable {...rowProps} />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-slate-500">

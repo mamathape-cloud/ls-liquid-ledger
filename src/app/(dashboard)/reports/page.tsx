@@ -8,8 +8,14 @@ import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/layout/ThunderModules";
 import { formatINR, formatStatus } from "@/lib/utils";
 import { downloadFile } from "@/lib/download";
+import { useAuth } from "@/hooks/useAuth";
+
+type ExpenseView = "all" | "claims" | "other_expenses";
 
 export default function ReportsPage() {
+  const { user } = useAuth();
+  const canViewEventExpenses = user?.permissions?.includes("event_expenses") ?? false;
+
   const [summary, setSummary] = useState<{
     totalClaims: number;
     totalEvents: number;
@@ -23,6 +29,7 @@ export default function ReportsPage() {
   const [employees, setEmployees] = useState<{ _id: string; name: string }[]>([]);
   const [eventId, setEventId] = useState("");
   const [employeeId, setEmployeeId] = useState("");
+  const [expenseView, setExpenseView] = useState<ExpenseView>("all");
   const [reportRows, setReportRows] = useState<Record<string, unknown>[]>([]);
   const [reportTotal, setReportTotal] = useState(0);
   const [reportLoaded, setReportLoaded] = useState(false);
@@ -37,10 +44,22 @@ export default function ReportsPage() {
     fetch("/api/events?limit=200")
       .then((r) => r.json())
       .then((d) => setEvents(d.data || []));
-    fetch("/api/users?filter.role=EMPLOYEE&limit=200")
+    fetch("/api/users?filter.roleSlug=EMPLOYEE&limit=200")
       .then((r) => r.json())
       .then((d) => setEmployees(d.data || []));
   }, []);
+
+  const buildParams = (extra: Record<string, string> = {}) => {
+    const params = new URLSearchParams({ type: reportType, ...extra });
+    if (reportType === "event") {
+      params.set("eventId", eventId);
+      if (canViewEventExpenses) {
+        params.set("expenseView", expenseView);
+      }
+    }
+    if (reportType === "employee") params.set("employeeId", employeeId);
+    return params;
+  };
 
   const loadReport = async () => {
     setReportError("");
@@ -57,10 +76,7 @@ export default function ReportsPage() {
         return;
       }
 
-      const params = new URLSearchParams({ type: reportType, detail: "true" });
-      if (reportType === "event") params.set("eventId", eventId);
-      if (reportType === "employee") params.set("employeeId", employeeId);
-
+      const params = buildParams({ detail: "true" });
       const res = await fetch(`/api/reports?${params}`);
       const json = await res.json();
 
@@ -91,10 +107,7 @@ export default function ReportsPage() {
         return;
       }
 
-      const params = new URLSearchParams({ type: reportType, format });
-      if (reportType === "event") params.set("eventId", eventId);
-      if (reportType === "employee") params.set("employeeId", employeeId);
-
+      const params = buildParams({ format });
       await downloadFile(`/api/reports?${params}`);
     } catch (err) {
       setReportError(err instanceof Error ? err.message : "Export failed");
@@ -109,7 +122,7 @@ export default function ReportsPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <PageHeader title="Reports" />
 
       {summary && (
@@ -168,9 +181,33 @@ export default function ReportsPage() {
           {reportType === "event" && (
             <div>
               <Label>Event</Label>
-              <Select value={eventId} onChange={(e) => setEventId(e.target.value)}>
+              <Select
+                value={eventId}
+                onChange={(e) => {
+                  setEventId(e.target.value);
+                  setReportLoaded(false);
+                  setReportRows([]);
+                }}
+              >
                 <option value="">Select event</option>
                 {events.map((e) => <option key={e._id} value={e._id}>{e.name}</option>)}
+              </Select>
+            </div>
+          )}
+          {reportType === "event" && eventId && canViewEventExpenses && (
+            <div>
+              <Label>Event Expenses</Label>
+              <Select
+                value={expenseView}
+                onChange={(e) => {
+                  setExpenseView(e.target.value as ExpenseView);
+                  setReportLoaded(false);
+                  setReportRows([]);
+                }}
+              >
+                <option value="all">All</option>
+                <option value="claims">Claims Only</option>
+                <option value="other_expenses">Other Expenses</option>
               </Select>
             </div>
           )}
@@ -210,38 +247,64 @@ export default function ReportsPage() {
         </div>
 
         {reportLoaded && (
-          <div className="mt-6">
+          <div className="mt-6 min-w-0 max-w-full">
             <p className="mb-2 text-sm text-slate-600">
               {reportTotal} record{reportTotal === 1 ? "" : "s"} found
             </p>
-            <div className="overflow-x-auto rounded-lg border">
-              {reportRows.length === 0 ? (
-                <p className="p-4 text-sm text-slate-500">No records found.</p>
-              ) : (
-                <table className="min-w-full text-sm">
-                  <thead className="bg-slate-50">
-                    <tr>
+            {reportRows.length === 0 ? (
+              <p className="rounded-lg border p-4 text-sm text-slate-500">No records found.</p>
+            ) : (
+              <>
+                <div className="space-y-3 md:hidden">
+                  {reportRows.map((row, idx) => (
+                    <div
+                      key={idx}
+                      className="rounded-xl border border-[var(--border)] bg-white p-4 shadow-sm"
+                    >
                       {rowHeaders.map((h) => (
-                        <th key={h} className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-600 sm:px-4">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reportRows.map((row, idx) => (
-                      <tr key={idx} className="border-t">
-                        {rowHeaders.map((h) => (
-                          <td key={h} className="whitespace-nowrap px-3 py-2 text-slate-900 sm:px-4">
+                        <div
+                          key={h}
+                          className="flex items-start justify-between gap-3 border-b border-[var(--border)] py-2.5 last:border-b-0"
+                        >
+                          <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            {h}
+                          </span>
+                          <span className="min-w-0 text-right text-sm text-slate-900">
                             {h === "Amount" && typeof row[h] === "number"
                               ? formatINR(row[h] as number)
                               : String(row[h] ?? "")}
-                          </td>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+                <div className="hidden overflow-x-auto rounded-lg border md:block">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        {rowHeaders.map((h) => (
+                          <th key={h} className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-600">{h}</th>
                         ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
+                    </thead>
+                    <tbody>
+                      {reportRows.map((row, idx) => (
+                        <tr key={idx} className="border-t">
+                          {rowHeaders.map((h) => (
+                            <td key={h} className="whitespace-nowrap px-4 py-2 text-slate-900">
+                              {h === "Amount" && typeof row[h] === "number"
+                                ? formatINR(row[h] as number)
+                                : String(row[h] ?? "")}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
           </div>
         )}
       </Card>

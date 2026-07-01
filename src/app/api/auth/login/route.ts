@@ -1,6 +1,7 @@
 import { connectDB } from "@/lib/db";
 import { User } from "@/models/User";
 import {
+  buildSessionUser,
   createToken,
   setAuthCookie,
   verifyPassword,
@@ -30,13 +31,7 @@ export async function POST(request: Request) {
       return jsonError("Invalid phone number or password", 401);
     }
 
-    const sessionUser = {
-      id: user._id.toString(),
-      phone: user.phone,
-      name: user.name,
-      role: user.role,
-    };
-
+    const sessionUser = await buildSessionUser(user);
     const token = await createToken(sessionUser);
     await setAuthCookie(token);
 

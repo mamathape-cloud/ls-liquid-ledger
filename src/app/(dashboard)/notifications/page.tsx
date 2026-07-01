@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
+import { PageHeader } from "@/components/layout/ThunderModules";
 
 interface NotificationItem {
   _id: string;
@@ -75,13 +76,12 @@ export default function NotificationsPage() {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Notifications</h1>
+    <div className="min-w-0 space-y-6">
+      <PageHeader title="Notifications">
         {tab === "unread" && (
           <Button variant="secondary" onClick={markAllRead}>Mark all read</Button>
         )}
-      </div>
+      </PageHeader>
 
       <div className="flex gap-2 border-b border-slate-200">
         <button

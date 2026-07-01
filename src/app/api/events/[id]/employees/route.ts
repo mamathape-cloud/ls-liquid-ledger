@@ -1,7 +1,7 @@
 import { connectDB } from "@/lib/db";
 import { Event } from "@/models/Event";
 import { User } from "@/models/User";
-import { requireRoles } from "@/lib/auth";
+import { requireModule } from "@/lib/auth";
 import { jsonOk, jsonError, handleApiError } from "@/lib/api";
 import { ROLES } from "@/lib/constants";
 import { z } from "zod";
@@ -16,7 +16,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireRoles([ROLES.FINANCE]);
+    await requireModule("events");
     const { id } = await params;
     const body = await request.json();
     const parsed = addEmployeeSchema.safeParse(body);
@@ -31,7 +31,7 @@ export async function POST(
 
     const employee = await User.findOne({
       _id: parsed.data.employeeId,
-      role: ROLES.EMPLOYEE,
+      roleSlug: ROLES.EMPLOYEE,
       status: "ACTIVE",
     });
 
@@ -67,7 +67,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireRoles([ROLES.FINANCE]);
+    await requireModule("events");
     const { id } = await params;
     const body = await request.json();
     const parsed = addEmployeeSchema.safeParse(body);
@@ -102,7 +102,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireRoles([ROLES.FINANCE]);
+    await requireModule("events");
     const { id } = await params;
     const { searchParams } = new URL(request.url);
     const employeeId = searchParams.get("employeeId");
