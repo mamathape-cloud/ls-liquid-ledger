@@ -213,7 +213,7 @@ export default function EventExpensesPage() {
   const grandTotal = planGrandTotal(planHeads);
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <PageHeader title="Event Expenses" />
       <p className="text-sm text-slate-500">Plan expense heads and sub-heads per event</p>
 
@@ -332,53 +332,123 @@ export default function EventExpensesPage() {
                 </Button>
               </div>
 
-              <div>
+              <div className="min-w-0">
                 <h2 className="mb-3 font-semibold">Saved Plan</h2>
-                <div className="overflow-x-auto rounded-lg border">
-                  {tableRows.length === 0 ? (
-                    <p className="p-4 text-sm text-slate-500">No heads in plan yet.</p>
-                  ) : (
-                    <table className="min-w-full text-sm">
-                      <thead className="bg-slate-50">
-                        <tr>
-                          <th className="px-3 py-2 text-left font-medium text-slate-600">Head</th>
-                          <th className="px-3 py-2 text-left font-medium text-slate-600">Sub-Head</th>
-                          <th className="px-3 py-2 text-left font-medium text-slate-600">Amount</th>
-                          <th className="px-3 py-2 text-left font-medium text-slate-600">Head Total</th>
-                          <th className="px-3 py-2 text-left font-medium text-slate-600">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {tableRows.map((row, idx) => (
-                          <tr key={idx} className="border-t">
-                            <td className="px-3 py-2">{row.head}</td>
-                            <td className="px-3 py-2">{row.subHead}</td>
-                            <td className="px-3 py-2">{formatINR(row.amount)}</td>
-                            <td className="px-3 py-2">{formatINR(row.headTotal)}</td>
-                            <td className="px-3 py-2">
-                              <div className="flex flex-wrap gap-2">
-                                <Button
-                                  type="button"
-                                  variant="secondary"
-                                  onClick={() => editHead(row.headIndex)}
-                                >
-                                  Edit
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="danger"
-                                  onClick={() => deleteHead(row.headIndex)}
-                                >
-                                  Delete
-                                </Button>
+                {tableRows.length === 0 ? (
+                  <p className="rounded-lg border p-4 text-sm text-slate-500">No heads in plan yet.</p>
+                ) : (
+                  <>
+                    <div className="space-y-3 md:hidden">
+                      {planHeads.map((head, headIndex) => (
+                        <div
+                          key={headIndex}
+                          className="rounded-xl border border-[var(--border)] bg-white p-4 shadow-sm"
+                        >
+                          <div className="flex items-start justify-between gap-3 border-b border-[var(--border)] py-2.5">
+                            <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              Head
+                            </span>
+                            <span className="min-w-0 text-right text-sm font-medium text-slate-900">
+                              {head.name}
+                            </span>
+                          </div>
+                          {head.subHeads.length > 0 ? (
+                            head.subHeads.map((sub, subIndex) => (
+                              <div
+                                key={subIndex}
+                                className="flex items-start justify-between gap-3 border-b border-[var(--border)] py-2.5"
+                              >
+                                <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                  Sub-Head
+                                </span>
+                                <span className="min-w-0 text-right text-sm text-slate-900">
+                                  {sub.name}
+                                  <span className="mt-0.5 block text-xs text-slate-500">
+                                    {formatINR(sub.amount)}
+                                  </span>
+                                </span>
                               </div>
-                            </td>
+                            ))
+                          ) : (
+                            <div className="flex items-start justify-between gap-3 border-b border-[var(--border)] py-2.5">
+                              <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Amount
+                              </span>
+                              <span className="min-w-0 text-right text-sm text-slate-900">
+                                {formatINR(head.amount ?? 0)}
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex items-start justify-between gap-3 py-2.5">
+                            <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              Head Total
+                            </span>
+                            <span className="min-w-0 text-right text-sm font-semibold text-[var(--primary)]">
+                              {formatINR(headTotal(head))}
+                            </span>
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-2 border-t border-[var(--border)] pt-3">
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              onClick={() => editHead(headIndex)}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="danger"
+                              onClick={() => deleteHead(headIndex)}
+                            >
+                              Delete
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="hidden overflow-x-auto rounded-lg border md:block">
+                      <table className="min-w-full text-sm">
+                        <thead className="bg-slate-50">
+                          <tr>
+                            <th className="px-4 py-2 text-left font-medium text-slate-600">Head</th>
+                            <th className="px-4 py-2 text-left font-medium text-slate-600">Sub-Head</th>
+                            <th className="px-4 py-2 text-left font-medium text-slate-600">Amount</th>
+                            <th className="px-4 py-2 text-left font-medium text-slate-600">Head Total</th>
+                            <th className="px-4 py-2 text-left font-medium text-slate-600">Actions</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
+                        </thead>
+                        <tbody>
+                          {tableRows.map((row, idx) => (
+                            <tr key={idx} className="border-t">
+                              <td className="px-4 py-2">{row.head}</td>
+                              <td className="px-4 py-2">{row.subHead}</td>
+                              <td className="px-4 py-2">{formatINR(row.amount)}</td>
+                              <td className="px-4 py-2">{formatINR(row.headTotal)}</td>
+                              <td className="px-4 py-2">
+                                <div className="flex flex-wrap gap-2">
+                                  <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() => editHead(row.headIndex)}
+                                  >
+                                    Edit
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="danger"
+                                    onClick={() => deleteHead(row.headIndex)}
+                                  >
+                                    Delete
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
               </div>
             </>
           )}
