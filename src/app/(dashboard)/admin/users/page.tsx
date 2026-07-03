@@ -130,7 +130,8 @@ export default function AdminUsersPage() {
     setRefreshKey((k) => k + 1);
   };
 
-  const isSystemAdmin = user?.roleSlug === ROLES.SYSTEM_ADMIN;
+  const isSystemAdminRow = (row: Record<string, unknown>) =>
+    String(row.roleSlug || row.role) === ROLES.SYSTEM_ADMIN;
 
   return (
     <div className="space-y-6">
@@ -197,23 +198,22 @@ export default function AdminUsersPage() {
             {
               key: "actions",
               header: "Actions",
-              render: (r) => (
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="secondary" onClick={(e) => { e.stopPropagation(); openEdit(r); }}>
-                    Edit
-                  </Button>
-                  {isSystemAdmin && (
+              render: (r) =>
+                isSystemAdminRow(r) ? (
+                  <span className="text-sm text-slate-400">—</span>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="secondary" onClick={(e) => { e.stopPropagation(); openEdit(r); }}>
+                      Edit
+                    </Button>
                     <Button variant="secondary" onClick={(e) => { e.stopPropagation(); resetPassword(r); }}>
                       Reset Password
                     </Button>
-                  )}
-                  {isSystemAdmin && (
                     <Button variant="danger" onClick={(e) => { e.stopPropagation(); setDeleteUser(r); }}>
                       Delete
                     </Button>
-                  )}
-                </div>
-              ),
+                  </div>
+                ),
             },
           ]}
         />

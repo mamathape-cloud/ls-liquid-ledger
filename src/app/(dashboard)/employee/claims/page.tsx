@@ -15,7 +15,7 @@ import { ProofLinks } from "@/components/ProofLinks";
 import { ClaimStatusCell } from "@/components/ClaimStatusCell";
 import { ClaimDetailModal } from "@/components/ClaimDetailModal";
 import { PageHeader } from "@/components/layout/ThunderModules";
-import { formatINR, formatDate } from "@/lib/utils";
+import { formatINR, formatDate, formatStatus } from "@/lib/utils";
 import { CLAIM_STATUSES } from "@/lib/constants";
 
 interface FormState {
@@ -39,6 +39,13 @@ export default function EmployeeClaimsPage() {
   const [editProofFiles, setEditProofFiles] = useState<FileList | null>(null);
   const [editError, setEditError] = useState("");
   const [viewClaimId, setViewClaimId] = useState<string | null>(null);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [eventBudget, setEventBudget] = useState<{
+    assignedBudget: number;
+    claimedAmount: number;
+    remaining: number;
+  } | null>(null);
 
   const { register, handleSubmit, watch, reset, setValue, formState: { errors } } = useForm<FormState>({
     defaultValues: { eventId: "", amount: "", claimDate: "", reason: "", categoryId: "" },
@@ -47,6 +54,18 @@ export default function EmployeeClaimsPage() {
   const editForm = useForm<FormState>();
 
   const reason = watch("reason");
+  const selectedEventId = watch("eventId");
+
+  useEffect(() => {
+    if (!selectedEventId) {
+      setEventBudget(null);
+      return;
+    }
+    fetch(`/api/claims/event-budget?eventId=${selectedEventId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setEventBudget(d || null))
+      .catch(() => setEventBudget(null));
+  }, [selectedEventId, refreshKey]);
 
   useEffect(() => {
     fetch("/api/events?limit=100").then((r) => r.json()).then((d) => setEvents(d.data || []));
@@ -161,6 +180,24 @@ export default function EmployeeClaimsPage() {
               {events.map((e) => <option key={e._id} value={e._id}>{e.name}</option>)}
             </Select>
             {(formError.eventId || errors.eventId) && <p className="mt-1 text-sm text-red-600">{formError.eventId || errors.eventId?.message}</p>}
+            {eventBudget && (
+              <div className="mt-3 grid gap-2 rounded-xl bg-[var(--surface-muted)] p-3 text-sm sm:grid-cols-3">
+                <div>
+                  <p className="text-slate-500">Event Amount Assigned</p>
+                  <p className="font-semibold text-slate-900">{formatINR(eventBudget.assignedBudget)}</p>
+                </div>
+                <div>
+                  <p className="text-slate-500">Claimed Amount</p>
+                  <p className="font-semibold text-slate-900">{formatINR(eventBudget.claimedAmount)}</p>
+                </div>
+                <div>
+                  <p className="text-slate-500">Remaining</p>
+                  <p className={`font-semibold ${eventBudget.remaining < 0 ? "text-red-600" : "text-[var(--primary)]"}`}>
+                    {formatINR(eventBudget.remaining)}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
           <div>
             <Label>Category</Label>
@@ -217,10 +254,39 @@ export default function EmployeeClaimsPage() {
       </Card>
 
       <Card>
+        <div className="mb-4 flex flex-wrap items-end gap-3">
+          <div className="w-full sm:max-w-[180px]">
+            <Label>From Date</Label>
+            <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          </div>
+          <div className="w-full sm:max-w-[180px]">
+            <Label>To Date</Label>
+            <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          </div>
+        </div>
         <DataTable
           endpoint="/api/claims"
           exportTable="claims"
           refreshKey={refreshKey}
+          extraParams={{
+            ...(dateFrom ? { "filter.dateFrom": dateFrom } : {}),
+            ...(dateTo ? { "filter.dateTo": dateTo } : {}),
+          }}
+          filters={[
+            {
+              key: "eventId",
+              label: "All Events",
+              options: events.map((e) => ({ label: e.name, value: e._id })),
+            },
+            {
+              key: "status",
+              label: "All Status",
+              options: Object.values(CLAIM_STATUSES).map((s) => ({
+                label: formatStatus(s),
+                value: s,
+              })),
+            },
+          ]}
           columns={[
             { key: "claimId", header: "Claim ID" },
             { key: "eventName", header: "Event" },
@@ -230,7 +296,7 @@ export default function EmployeeClaimsPage() {
             {
               key: "proofFiles",
               header: "Proof",
-              render: (r) => <ProofLinks files={r.proofFiles} />,
+              render: (r) => <ProofLinks files={r.proofFiles} truncateAt={15} />,
             },
             {
               key: "status",

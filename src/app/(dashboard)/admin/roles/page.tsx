@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ModuleCheckboxGrid } from "@/components/ModuleCheckboxGrid";
+import { PageHeader } from "@/components/layout/ThunderModules";
 import { formatStatus } from "@/lib/utils";
 
 type RoleForm = z.infer<typeof roleCreateSchema>;
@@ -112,7 +113,7 @@ export default function AdminRolesPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Roles & Module Access</h1>
+      <PageHeader title="Roles & Module Access" />
 
       <Card>
         <h2 className="mb-4 font-semibold">Create Role</h2>

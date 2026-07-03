@@ -97,7 +97,7 @@ export default function FinanceClaimsPage() {
             {
               key: "proofFiles",
               header: "Proof",
-              render: (r) => <ProofLinks files={r.proofFiles} />,
+              render: (r) => <ProofLinks files={r.proofFiles} truncateAt={15} />,
             },
             {
               key: "status",

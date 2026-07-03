@@ -39,6 +39,19 @@ export async function GET(request: Request) {
       query.batchId = { $exists: false };
     }
 
+    const dateFrom = filters.dateFrom;
+    const dateTo = filters.dateTo;
+    if (dateFrom || dateTo) {
+      const claimDate: Record<string, Date> = {};
+      if (dateFrom) claimDate.$gte = new Date(dateFrom);
+      if (dateTo) {
+        const end = new Date(dateTo);
+        end.setHours(23, 59, 59, 999);
+        claimDate.$lte = end;
+      }
+      query.claimDate = claimDate;
+    }
+
     if (session.roleSlug === ROLES.EMPLOYEE) {
       query.employeeId = session.id;
     }

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { BUDGET_TYPES } from "@/lib/constants";
+import { BUDGET_TYPES, EVENT_STATUSES } from "@/lib/constants";
 import { normalizePhone } from "@/lib/utils";
 
 const phoneSchema = z
@@ -124,6 +124,24 @@ export const eventSchema = z
       path: ["eventBudget"],
     }
   );
+
+export const eventUpdateSchema = z.object({
+  name: z.string().min(2, "Event name is required").optional(),
+  description: z.string().optional(),
+  startDate: z.string().min(1).optional(),
+  endDate: z.string().min(1).optional(),
+  budgetType: z.enum([BUDGET_TYPES.PER_EVENT, BUDGET_TYPES.PER_EMPLOYEE]).optional(),
+  eventBudget: z.coerce.number().min(0).optional(),
+  status: z.enum([EVENT_STATUSES.ACTIVE, EVENT_STATUSES.CLOSED]).optional(),
+  assignedEmployees: z
+    .array(
+      z.object({
+        employeeId: z.string().min(1),
+        preApprovedBudget: z.coerce.number().min(0),
+      })
+    )
+    .optional(),
+});
 
 export const claimReviewSchema = z
   .object({

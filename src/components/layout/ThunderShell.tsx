@@ -115,8 +115,8 @@ export function ThunderShell({ user, children }: ThunderShellProps) {
       {menuOpen && (
         <div className="fixed inset-0 z-50">
           <button type="button" className="absolute inset-0 bg-black/40" onClick={() => setMenuOpen(false)} aria-label="Close menu" />
-          <div className="absolute left-0 right-0 top-0 max-h-[85vh] overflow-y-auto rounded-b-3xl bg-white p-5 pt-[max(1.25rem,env(safe-area-inset-top))] shadow-2xl lg:left-auto lg:right-4 lg:top-4 lg:max-h-none lg:w-80 lg:rounded-2xl lg:pt-5">
-            <div className="mb-4 flex items-center gap-3 border-b border-[var(--border)] pb-4">
+          <div className="absolute left-0 right-0 top-0 flex max-h-[85vh] flex-col rounded-b-3xl bg-white p-5 pt-[max(1.25rem,env(safe-area-inset-top))] shadow-2xl lg:left-auto lg:right-4 lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:w-80 lg:rounded-2xl lg:pt-5">
+            <div className="mb-4 flex shrink-0 items-center gap-3 border-b border-[var(--border)] pb-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--primary-soft)] text-lg font-bold text-[var(--primary)]">
                 {user.name.charAt(0).toUpperCase()}
               </div>
@@ -125,28 +125,30 @@ export function ThunderShell({ user, children }: ThunderShellProps) {
                 <p className="text-xs text-slate-500">{user.roleSlug.replace(/_/g, " ")}</p>
               </div>
             </div>
-            <div className="grid gap-1">
-              {allNav.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMenuOpen(false)}
-                  className={cn(
-                    "flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition",
-                    pathname === item.href
-                      ? "bg-[var(--primary-soft)] text-[var(--primary)]"
-                      : "text-slate-700 hover:bg-slate-50"
-                  )}
-                >
-                  <NavIcon name={item.icon} className="h-5 w-5 shrink-0" />
-                  <span>{item.label}</span>
-                </Link>
-              ))}
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+              <div className="grid gap-1">
+                {allNav.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMenuOpen(false)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition",
+                      pathname === item.href
+                        ? "bg-[var(--primary-soft)] text-[var(--primary)]"
+                        : "text-slate-700 hover:bg-slate-50"
+                    )}
+                  >
+                    <NavIcon name={item.icon} className="h-5 w-5 shrink-0" />
+                    <span>{item.label}</span>
+                  </Link>
+                ))}
+              </div>
             </div>
             <button
               type="button"
               onClick={logout}
-              className="mt-4 w-full rounded-xl border border-red-200 bg-red-50 py-3 text-sm font-medium text-red-600"
+              className="mt-4 w-full shrink-0 rounded-xl border border-red-200 bg-red-50 py-3 text-sm font-medium text-red-600"
             >
               Logout
             </button>

@@ -18,6 +18,15 @@ import { BUDGET_TYPES } from "@/lib/constants";
 import { formatINR, formatDate, formatStatus } from "@/lib/utils";
 
 type EventForm = z.input<typeof eventSchema>;
+type EventEditForm = {
+  name: string;
+  description?: string;
+  startDate: string;
+  endDate: string;
+  budgetType: string;
+  eventBudget?: number;
+  status: string;
+};
 
 interface EmployeeOption {
   _id: string;
@@ -42,6 +51,9 @@ export default function FinanceEventsPage() {
   const [editAssignment, setEditAssignment] = useState<AssignedEmployee | null>(null);
   const [editBudget, setEditBudget] = useState("");
   const [deleteAssignment, setDeleteAssignment] = useState<AssignedEmployee | null>(null);
+  const [editEvent, setEditEvent] = useState<Record<string, unknown> | null>(null);
+  const [deleteEvent, setDeleteEvent] = useState<Record<string, unknown> | null>(null);
+  const [editError, setEditError] = useState("");
 
   const {
     register,
@@ -63,7 +75,10 @@ export default function FinanceEventsPage() {
     name: "assignedEmployees",
   });
 
+  const editForm = useForm<EventEditForm>();
+
   const budgetType = watch("budgetType");
+  const editBudgetType = editForm.watch("budgetType");
   const watchedAssignments = watch("assignedEmployees");
 
   useEffect(() => {
@@ -168,6 +183,52 @@ export default function FinanceEventsPage() {
     );
     setDeleteAssignment(null);
     await loadEventDetails(String(manageEvent._id));
+    setRefreshKey((k) => k + 1);
+  };
+
+  const openEdit = (row: Record<string, unknown>) => {
+    setEditError("");
+    setEditEvent(row);
+    editForm.reset({
+      name: String(row.name),
+      description: String(row.description || ""),
+      startDate: new Date(String(row.startDate)).toISOString().split("T")[0],
+      endDate: new Date(String(row.endDate)).toISOString().split("T")[0],
+      budgetType: String(row.budgetType),
+      eventBudget: row.eventBudget ? Number(row.eventBudget) : undefined,
+      status: String(row.status || "ACTIVE"),
+    });
+  };
+
+  const saveEdit = async (data: EventEditForm) => {
+    if (!editEvent) return;
+    setEditError("");
+    const res = await fetch(`/api/events/${editEvent._id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      setEditError(json.message || "Failed to update event");
+      return;
+    }
+    setEditEvent(null);
+    setRefreshKey((k) => k + 1);
+  };
+
+  const confirmDeleteEvent = async () => {
+    if (!deleteEvent) return;
+    const res = await fetch(`/api/events/${deleteEvent._id}`, { method: "DELETE" });
+    const json = await res.json();
+    if (!res.ok) {
+      alert(json.message || "Failed to delete event");
+      return;
+    }
+    if (json.closed) {
+      alert(json.message || "Event was closed because it has linked claims");
+    }
+    setDeleteEvent(null);
     setRefreshKey((k) => k + 1);
   };
 
@@ -289,12 +350,21 @@ export default function FinanceEventsPage() {
             {
               key: "actions",
               header: "Actions",
-              render: (r) =>
-                r.budgetType === BUDGET_TYPES.PER_EMPLOYEE ? (
-                  <Button variant="secondary" onClick={(e) => { e.stopPropagation(); openManage(r); }}>
-                    Manage Employees
+              render: (r) => (
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="secondary" onClick={(e) => { e.stopPropagation(); openEdit(r); }}>
+                    Edit
                   </Button>
-                ) : null,
+                  {r.budgetType === BUDGET_TYPES.PER_EMPLOYEE && (
+                    <Button variant="secondary" onClick={(e) => { e.stopPropagation(); openManage(r); }}>
+                      Manage Employees
+                    </Button>
+                  )}
+                  <Button variant="danger" onClick={(e) => { e.stopPropagation(); setDeleteEvent(r); }}>
+                    Delete
+                  </Button>
+                </div>
+              ),
             },
           ]}
         />
@@ -393,6 +463,68 @@ export default function FinanceEventsPage() {
         variant="danger"
         onConfirm={confirmRemoveAssignment}
         onCancel={() => setDeleteAssignment(null)}
+      />
+
+      <Modal
+        open={!!editEvent}
+        onClose={() => setEditEvent(null)}
+        title={`Edit Event — ${String(editEvent?.name || "")}`}
+      >
+        <form onSubmit={editForm.handleSubmit(saveEdit)} className="space-y-4">
+          <div>
+            <Label>Event Name</Label>
+            <Input {...editForm.register("name", { required: true })} />
+          </div>
+          <div>
+            <Label>Budget Type</Label>
+            <Select {...editForm.register("budgetType")}>
+              <option value={BUDGET_TYPES.PER_EMPLOYEE}>Per Employee</option>
+              <option value={BUDGET_TYPES.PER_EVENT}>Per Event</option>
+            </Select>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label>Start Date</Label>
+              <Input type="date" {...editForm.register("startDate", { required: true })} />
+            </div>
+            <div>
+              <Label>End Date</Label>
+              <Input type="date" {...editForm.register("endDate", { required: true })} />
+            </div>
+          </div>
+          {editBudgetType === BUDGET_TYPES.PER_EVENT && (
+            <div>
+              <Label>Event Budget (INR)</Label>
+              <Input type="number" step="0.01" {...editForm.register("eventBudget")} />
+            </div>
+          )}
+          <div>
+            <Label>Status</Label>
+            <Select {...editForm.register("status")}>
+              <option value="ACTIVE">Active</option>
+              <option value="CLOSED">Closed</option>
+            </Select>
+          </div>
+          <div>
+            <Label>Description</Label>
+            <Textarea {...editForm.register("description")} />
+          </div>
+          {editError && <p className="text-sm text-red-600">{editError}</p>}
+          <div className="flex gap-2">
+            <Button type="submit">Save Changes</Button>
+            <Button type="button" variant="ghost" onClick={() => setEditEvent(null)}>Cancel</Button>
+          </div>
+        </form>
+      </Modal>
+
+      <ConfirmDialog
+        open={!!deleteEvent}
+        title="Delete Event"
+        message={`Delete "${String(deleteEvent?.name || "this event")}"? Events with linked claims will be closed instead of removed.`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={confirmDeleteEvent}
+        onCancel={() => setDeleteEvent(null)}
       />
     </div>
   );
