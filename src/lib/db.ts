@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { registerModels } from "@/models/registry";
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
@@ -24,6 +25,10 @@ const cached: MongooseCache = global.mongooseCache ?? {
 global.mongooseCache = cached;
 
 export async function connectDB() {
+  // Ensure every model's schema is registered (survives production
+  // tree-shaking) so string-based .populate() never hits MissingSchemaError.
+  registerModels();
+
   if (cached.conn) {
     return cached.conn;
   }
