@@ -1,0 +1,78 @@
+# CI/CD: builds and deploys the app to AWS (S3 + CloudFront + Lambda) via SST.
+#
+# Branch  ->  GitHub Environment  ->  SST stage
+#   main   ->  production          ->  production
+#   dev    ->  dev                 ->  dev
+#
+# REQUIRED CONFIG (repo owner / admin adds these — Settings -> Secrets and variables -> Actions):
+#
+#   Repository-level Secrets:
+#     AWS_ACCESS_KEY_ID       (access key for the AWS account)
+#     AWS_SECRET_ACCESS_KEY   (its secret)
+#   Repository-level Variables:
+#     AWS_REGION              e.g. ap-south-1
+#     NEXT_PUBLIC_APP_NAME    e.g. Liquid Ledger
+#
+#   Per-Environment Secrets (Settings -> Environments -> "production" and/or "dev"):
+#     MONGODB_URI             MongoDB connection string for that environment
+#     JWT_SECRET              JWT signing secret for that environment
+#
+# Until the secrets are added, this workflow runs green but skips the deploy (with a warning).
+
+name: Deploy to AWS (SST)
+
+on:
+  push:
+    branches: [main, dev]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ${{ github.ref_name == 'main' && 'production' || 'dev' }}
+    env:
+      STAGE: ${{ github.ref_name == 'main' && 'production' || 'dev' }}
+    steps:
+      - name: Check that required secrets are configured
+        id: pre
+        env:
+          AWS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          DB_URI: ${{ secrets.MONGODB_URI }}
+        run: |
+          if [ -n "$AWS_KEY" ] && [ -n "$DB_URI" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Deploy skipped — AWS_ACCESS_KEY_ID and/or MONGODB_URI are not set for the '${{ env.STAGE }}' environment. The repo owner must add them (see the header of .github/workflows/deploy.yml)."
+          fi
+
+      - name: Checkout
+        if: steps.pre.outputs.ready == 'true'
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        if: steps.pre.outputs.ready == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        if: steps.pre.outputs.ready == 'true'
+        run: npm ci
+
+      - name: Deploy with SST
+        if: steps.pre.outputs.ready == 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ vars.AWS_REGION || 'ap-south-1' }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          NEXT_PUBLIC_APP_NAME: ${{ vars.NEXT_PUBLIC_APP_NAME || 'Liquid Ledger' }}
+        run: npx sst deploy --stage "$STAGE"

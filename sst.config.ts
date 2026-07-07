@@ -8,8 +8,10 @@ export default $config({
       home: "aws",
       providers: {
         aws: {
-          profile: "munark-shrinidi",
-          region: "ap-south-1",
+          region: process.env.AWS_REGION ?? "ap-south-1",
+          // In CI (GitHub Actions) credentials come from env vars / secrets;
+          // locally we use the named AWS profile.
+          ...(process.env.CI ? {} : { profile: "munark-shrinidi" }),
         },
       },
     };
