@@ -63,10 +63,10 @@ export async function GET(
     const storage = getStorageProvider();
     const absolutePath = storage.getAbsolutePath(storedPath);
 
-    const uploadsRoot = path.join(
-      process.cwd(),
-      process.env.UPLOAD_DIR || "uploads"
-    );
+    const uploadDir = process.env.UPLOAD_DIR || "uploads";
+    const uploadsRoot = path.isAbsolute(uploadDir)
+      ? uploadDir
+      : path.join(process.cwd(), uploadDir);
     if (!absolutePath.startsWith(uploadsRoot)) {
       return jsonError("Forbidden", 403);
     }

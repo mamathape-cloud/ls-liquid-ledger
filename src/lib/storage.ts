@@ -43,7 +43,12 @@ class LocalStorageProvider implements StorageProvider {
   private baseDir: string;
 
   constructor() {
-    this.baseDir = path.join(process.cwd(), process.env.UPLOAD_DIR || "uploads");
+    // Honor an absolute UPLOAD_DIR (e.g. /tmp/uploads on Lambda, whose working
+    // dir /var/task is read-only). Relative values stay under the project cwd.
+    const uploadDir = process.env.UPLOAD_DIR || "uploads";
+    this.baseDir = path.isAbsolute(uploadDir)
+      ? uploadDir
+      : path.join(process.cwd(), uploadDir);
   }
 
   private async ensureDir(dir: string) {

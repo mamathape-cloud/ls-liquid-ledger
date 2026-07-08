@@ -124,10 +124,14 @@ export async function requireRoles(roles: RoleSlug[], req?: NextRequest) {
 
 export async function requireModule(moduleKey: AppModuleKey, req?: NextRequest) {
   const session = await requireAuth(req);
-  if (!session.permissions.includes(moduleKey)) {
+  // Use live permissions from the DB rather than the ones baked into the JWT at
+  // login, so role/permission changes take effect immediately (no re-login) and
+  // stay consistent with what the UI shows via /api/auth/me.
+  const permissions = await getRolePermissions(session.roleSlug);
+  if (!permissions.includes(moduleKey)) {
     throw new Error("FORBIDDEN");
   }
-  return session;
+  return { ...session, permissions };
 }
 
 export async function requireAnyModule(
@@ -135,10 +139,11 @@ export async function requireAnyModule(
   req?: NextRequest
 ) {
   const session = await requireAuth(req);
-  if (!moduleKeys.some((key) => session.permissions.includes(key))) {
+  const permissions = await getRolePermissions(session.roleSlug);
+  if (!moduleKeys.some((key) => permissions.includes(key))) {
     throw new Error("FORBIDDEN");
   }
-  return session;
+  return { ...session, permissions };
 }
 
 export async function getUserByPhone(phone: string) {
