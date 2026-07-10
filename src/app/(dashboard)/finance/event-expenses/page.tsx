@@ -220,7 +220,7 @@ export default function EventExpensesPage() {
       <Card>
         <div className="space-y-4">
           <div>
-            <Label>Event</Label>
+            <Label required>Event</Label>
             <Select
               value={eventId}
               onChange={(e) => {
@@ -247,7 +247,7 @@ export default function EventExpensesPage() {
                 </h2>
                 <div className="mb-3 flex flex-wrap items-end gap-3">
                   <div className="min-w-[160px] flex-1">
-                    <Label>Head</Label>
+                    <Label required>Head</Label>
                     <Input
                       value={draft.name}
                       onChange={(e) => updateDraft({ name: e.target.value })}
@@ -256,7 +256,7 @@ export default function EventExpensesPage() {
                   </div>
                   {draft.subHeads.length === 0 && (
                     <div className="w-36">
-                      <Label>Amount</Label>
+                      <Label required>Amount</Label>
                       <Input
                         type="number"
                         min={0}

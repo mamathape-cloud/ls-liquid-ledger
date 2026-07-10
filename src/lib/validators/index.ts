@@ -2,14 +2,41 @@ import { z } from "zod";
 import { BUDGET_TYPES, EVENT_STATUSES } from "@/lib/constants";
 import { normalizePhone } from "@/lib/utils";
 
+function withinWordLimit(maxWords: number) {
+  return (val?: string) => {
+    if (!val?.trim()) return true;
+    return val.trim().split(/\s+/).filter(Boolean).length <= maxWords;
+  };
+}
+
+const descriptionSchema = z
+  .string()
+  .optional()
+  .refine(withinWordLimit(250), {
+    message: "Description must be 250 words or less",
+  });
+
+const eventBudgetAmountSchema = z.coerce
+  .number({ error: "Valid budget is required" })
+  .refine((n) => Number.isFinite(n) && n > 0, {
+    message: "Budget must be greater than 0",
+  });
+
+const employeeAssignmentSchema = z.object({
+  employeeId: z.string().min(1, "Please select an employee"),
+  preApprovedBudget: eventBudgetAmountSchema,
+});
+
 const phoneSchema = z
   .string()
   .min(1, "Phone number is required")
-  .transform(normalizePhone)
-  .refine((v) => /^\d{10}$/.test(v), "Enter a valid 10-digit phone number");
+  .refine((v) => /^\d+$/.test(v), "Only numbers are allowed (no decimals or symbols)")
+  .refine((v) => v.length === 10, "Phone number must be exactly 10 digits")
+  .transform(normalizePhone);
 
 const passwordSchema = z
   .string()
+  .min(1, "Password is required")
   .min(6, "Password must be at least 6 characters");
 
 export const loginSchema = z.object({
@@ -95,20 +122,13 @@ export const categorySchema = z.object({
 export const eventSchema = z
   .object({
     name: z.string().min(2, "Event name is required"),
-    description: z.string().optional(),
+    description: descriptionSchema,
     startDate: z.string().min(1, "Start date is required"),
     endDate: z.string().min(1, "End date is required"),
     budgetType: z.enum([BUDGET_TYPES.PER_EVENT, BUDGET_TYPES.PER_EMPLOYEE]),
     eventBudget: z.coerce.number().min(0).optional(),
     assignedEmployees: z
-      .array(
-        z.object({
-          employeeId: z.string().min(1, "Employee is required"),
-          preApprovedBudget: z.coerce
-            .number()
-            .min(0, "Budget must be 0 or more"),
-        })
-      )
+      .array(employeeAssignmentSchema)
       .min(1, "Assign at least one employee"),
   })
   .refine((data) => new Date(data.endDate) >= new Date(data.startDate), {
@@ -120,27 +140,44 @@ export const eventSchema = z
       data.budgetType !== BUDGET_TYPES.PER_EVENT ||
       (data.eventBudget !== undefined && data.eventBudget > 0),
     {
-      message: "Event budget is required for per-event budget type",
+      message: "Budget must be greater than 0",
+      path: ["eventBudget"],
+    }
+  );
+
+export const eventEditFormSchema = z
+  .object({
+    name: z.string().min(2, "Event name is required"),
+    description: descriptionSchema,
+    startDate: z.string().min(1, "Start date is required"),
+    endDate: z.string().min(1, "End date is required"),
+    budgetType: z.enum([BUDGET_TYPES.PER_EVENT, BUDGET_TYPES.PER_EMPLOYEE]),
+    eventBudget: z.coerce.number().min(0).optional(),
+    status: z.enum([EVENT_STATUSES.ACTIVE, EVENT_STATUSES.CLOSED]),
+  })
+  .refine((data) => new Date(data.endDate) >= new Date(data.startDate), {
+    message: "End date must be on or after start date",
+    path: ["endDate"],
+  })
+  .refine(
+    (data) =>
+      data.budgetType !== BUDGET_TYPES.PER_EVENT ||
+      (data.eventBudget !== undefined && data.eventBudget > 0),
+    {
+      message: "Budget must be greater than 0",
       path: ["eventBudget"],
     }
   );
 
 export const eventUpdateSchema = z.object({
   name: z.string().min(2, "Event name is required").optional(),
-  description: z.string().optional(),
+  description: descriptionSchema,
   startDate: z.string().min(1).optional(),
   endDate: z.string().min(1).optional(),
   budgetType: z.enum([BUDGET_TYPES.PER_EVENT, BUDGET_TYPES.PER_EMPLOYEE]).optional(),
   eventBudget: z.coerce.number().min(0).optional(),
   status: z.enum([EVENT_STATUSES.ACTIVE, EVENT_STATUSES.CLOSED]).optional(),
-  assignedEmployees: z
-    .array(
-      z.object({
-        employeeId: z.string().min(1),
-        preApprovedBudget: z.coerce.number().min(0),
-      })
-    )
-    .optional(),
+  assignedEmployees: z.array(employeeAssignmentSchema).optional(),
 });
 
 export const claimReviewSchema = z

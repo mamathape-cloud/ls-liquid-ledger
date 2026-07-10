@@ -28,6 +28,9 @@ interface DataTableProps<T extends Record<string, unknown>> {
   onRowClick?: (row: T) => void;
   refreshKey?: number;
   searchPlaceholder?: string;
+  filterSlot?: React.ReactNode;
+  externalFiltersActive?: boolean;
+  onClearExternalFilters?: () => void;
 }
 
 const EMPTY_PARAMS: Record<string, string> = {};
@@ -184,6 +187,9 @@ export function DataTable<T extends Record<string, unknown>>({
   onRowClick,
   refreshKey = 0,
   searchPlaceholder = "Search records...",
+  filterSlot,
+  externalFiltersActive = false,
+  onClearExternalFilters,
 }: DataTableProps<T>) {
   const [data, setData] = useState<T[]>([]);
   const [meta, setMeta] = useState<PaginationMeta>({
@@ -264,6 +270,20 @@ export function DataTable<T extends Record<string, unknown>>({
   const showInitialLoading = initialLoading && data.length === 0;
   const showEmpty = !showInitialLoading && !refreshing && data.length === 0;
 
+  const hasActiveFilters =
+    externalFiltersActive ||
+    Boolean(search) ||
+    Boolean(searchInput) ||
+    Object.values(filterValues).some(Boolean);
+
+  const clearAllFilters = () => {
+    setFilterValues({});
+    setSearch("");
+    setSearchInput("");
+    setPage(1);
+    onClearExternalFilters?.();
+  };
+
   const rowProps: DataRowsProps<T> = {
     data,
     columns,
@@ -276,7 +296,8 @@ export function DataTable<T extends Record<string, unknown>>({
   return (
     <div className="space-y-4">
       <div className="rounded-2xl bg-[var(--surface-muted)] p-3 sm:p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+          {filterSlot}
           {filters.map((filter) => (
             <div key={filter.key} className="w-full sm:max-w-[180px]">
               <Select
@@ -302,6 +323,11 @@ export function DataTable<T extends Record<string, unknown>>({
             <Button type="button" onClick={() => setSearch(searchInput)} className="shrink-0">
               Search
             </Button>
+            {hasActiveFilters && (
+              <Button type="button" variant="ghost" onClick={clearAllFilters} className="shrink-0">
+                Clear All
+              </Button>
+            )}
           </div>
         </div>
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
@@ -12,14 +12,43 @@ import { formatINR, formatDate } from "@/lib/utils";
 
 export default function SearchPage() {
   const [claimId, setClaimId] = useState("");
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [results, setResults] = useState<Record<string, unknown>[]>([]);
   const [searched, setSearched] = useState(false);
 
-  const search = async () => {
-    const res = await fetch(`/api/claims?claimId=${encodeURIComponent(claimId)}&limit=10`);
+  useEffect(() => {
+    if (!claimId || claimId.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      fetch(`/api/claims/suggest?q=${encodeURIComponent(claimId)}`)
+        .then((r) => r.json())
+        .then((d) => {
+          const items = (d.suggestions || []) as string[];
+          setSuggestions(
+            items.filter((s) => s.toLowerCase() !== claimId.trim().toLowerCase())
+          );
+        });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [claimId]);
+
+  const search = async (id?: string) => {
+    const query = (id ?? claimId).trim();
+    if (!query) return;
+    const res = await fetch(`/api/claims?claimId=${encodeURIComponent(query)}&limit=10`);
     const json = await res.json();
     setResults(json.data || []);
     setSearched(true);
+    setSuggestions([]);
+  };
+
+  const clearFilters = () => {
+    setClaimId("");
+    setSuggestions([]);
+    setResults([]);
+    setSearched(false);
   };
 
   return (
@@ -27,15 +56,39 @@ export default function SearchPage() {
       <PageHeader title="Track Claim" />
       <Card>
         <div className="flex flex-wrap items-end gap-4">
-          <div className="min-w-[280px] flex-1">
-            <Label>Claim ID</Label>
+          <div className="relative min-w-[280px] flex-1">
+            <Label required>Claim ID</Label>
             <Input
               value={claimId}
               onChange={(e) => setClaimId(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && search()}
               placeholder="e.g. LL-2026-000123"
             />
+            {suggestions.length > 0 && (
+              <div className="absolute z-10 mt-1 w-full rounded-lg border bg-white shadow">
+                {suggestions.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
+                    onClick={() => {
+                      setClaimId(s);
+                      setSuggestions([]);
+                      search(s);
+                    }}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-          <Button onClick={search}>Search</Button>
+          <Button onClick={() => search()}>Search</Button>
+          {(claimId || searched) && (
+            <Button type="button" variant="ghost" onClick={clearFilters}>
+              Clear All
+            </Button>
+          )}
         </div>
       </Card>
 

@@ -87,7 +87,7 @@ export default function FinanceDisbursePage() {
         />
 
         <div className="mt-4 max-w-md">
-          <Label>Payment Reference</Label>
+          <Label required>Payment Reference</Label>
           <Input
             value={paymentRef}
             onChange={(e) => setPaymentRef(e.target.value)}

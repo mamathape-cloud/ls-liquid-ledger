@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DataTable } from "@/components/DataTable";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Textarea";
 import { Label } from "@/components/ui/Label";
 import { ProofLinks } from "@/components/ProofLinks";
-import { ClaimStatusCell } from "@/components/ClaimStatusCell";
 import { ClaimDetailModal } from "@/components/ClaimDetailModal";
+import { ClaimStatusCell } from "@/components/ClaimStatusCell";
 import { PageHeader } from "@/components/layout/ThunderModules";
 import { formatINR, formatDate, formatStatus } from "@/lib/utils";
 import { CLAIM_STATUSES } from "@/lib/constants";
@@ -29,6 +29,7 @@ export default function FinanceClaimsPage() {
   const [rejectionReason, setRejectionReason] = useState("");
   const [actionError, setActionError] = useState("");
   const [viewClaimId, setViewClaimId] = useState<string | null>(null);
+  const reviewSectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!selected) {
@@ -38,6 +39,14 @@ export default function FinanceClaimsPage() {
     fetch(`/api/claims/${selected._id}`)
       .then((r) => r.json())
       .then((d) => setClaimDetails(d.claim));
+  }, [selected]);
+
+  useEffect(() => {
+    if (!selected) return;
+    const timer = setTimeout(() => {
+      reviewSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+    return () => clearTimeout(timer);
   }, [selected]);
 
   const openReview = (row: Record<string, unknown>) => {
@@ -132,42 +141,44 @@ export default function FinanceClaimsPage() {
       </Card>
 
       {selected && (
-        <Card>
-          <h2 className="mb-4 font-semibold">Review Claim {String(selected.claimId)}</h2>
-          <p className="text-sm text-slate-600">Reason: {claimDetails?.reason || String(selected.reason)}</p>
-          <p className="mt-1 text-sm text-slate-600">Amount: {formatINR(Number(selected.amount))}</p>
+        <div ref={reviewSectionRef} className="scroll-mt-6">
+          <Card>
+            <h2 className="mb-4 font-semibold">Review Claim {String(selected.claimId)}</h2>
+            <p className="text-sm text-slate-600">Reason: {claimDetails?.reason || String(selected.reason)}</p>
+            <p className="mt-1 text-sm text-slate-600">Amount: {formatINR(Number(selected.amount))}</p>
 
-          {claimDetails?.proofFiles && claimDetails.proofFiles.length > 0 && (
+            {claimDetails?.proofFiles && claimDetails.proofFiles.length > 0 && (
+              <div className="mt-4">
+                <Label>Proof Attachments</Label>
+                <ul className="mt-2 space-y-2">
+                  {claimDetails.proofFiles.map((file) => (
+                    <li key={file.storedPath}>
+                      <a
+                        href={`/api/uploads/${file.storedPath}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-[var(--primary)] hover:underline"
+                      >
+                        {file.originalName}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <div className="mt-4">
-              <Label>Proof Attachments</Label>
-              <ul className="mt-2 space-y-2">
-                {claimDetails.proofFiles.map((file) => (
-                  <li key={file.storedPath}>
-                    <a
-                      href={`/api/uploads/${file.storedPath}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-[var(--primary)] hover:underline"
-                    >
-                      {file.originalName}
-                    </a>
-                  </li>
-                ))}
-              </ul>
+              <Label required>Rejection Reason</Label>
+              <Textarea value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} placeholder="Required when rejecting" />
+              {actionError && <p className="mt-1 text-sm text-red-600">{actionError}</p>}
             </div>
-          )}
-
-          <div className="mt-4">
-            <Label>Rejection Reason (required if rejecting)</Label>
-            <Textarea value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} />
-            {actionError && <p className="mt-1 text-sm text-red-600">{actionError}</p>}
-          </div>
-          <div className="mt-4 flex gap-2">
-            <Button onClick={() => review("approve")}>Approve</Button>
-            <Button variant="danger" onClick={() => review("reject")}>Reject</Button>
-            <Button variant="ghost" onClick={() => setSelected(null)}>Cancel</Button>
-          </div>
-        </Card>
+            <div className="mt-4 flex gap-2">
+              <Button onClick={() => review("approve")}>Approve</Button>
+              <Button variant="danger" onClick={() => review("reject")}>Reject</Button>
+              <Button variant="ghost" onClick={() => setSelected(null)}>Cancel</Button>
+            </div>
+          </Card>
+        </div>
       )}
 
       <ClaimDetailModal

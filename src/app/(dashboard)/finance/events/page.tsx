@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { eventSchema } from "@/lib/validators";
+import { eventSchema, eventEditFormSchema } from "@/lib/validators";
 import { z } from "zod";
 import { DataTable } from "@/components/DataTable";
 import { Card } from "@/components/ui/Card";
@@ -14,19 +14,17 @@ import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { PageHeader } from "@/components/layout/ThunderModules";
 import { BUDGET_TYPES } from "@/lib/constants";
 import { formatINR, formatDate, formatStatus } from "@/lib/utils";
 
 type EventForm = z.input<typeof eventSchema>;
-type EventEditForm = {
-  name: string;
-  description?: string;
-  startDate: string;
-  endDate: string;
-  budgetType: string;
-  eventBudget?: number;
-  status: string;
-};
+type EventEditForm = z.input<typeof eventEditFormSchema>;
+
+function countWords(text?: string) {
+  if (!text?.trim()) return 0;
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
 
 interface EmployeeOption {
   _id: string;
@@ -75,10 +73,14 @@ export default function FinanceEventsPage() {
     name: "assignedEmployees",
   });
 
-  const editForm = useForm<EventEditForm>();
+  const editForm = useForm<EventEditForm>({
+    resolver: zodResolver(eventEditFormSchema),
+  });
 
   const budgetType = watch("budgetType");
+  const description = watch("description");
   const editBudgetType = editForm.watch("budgetType");
+  const editDescription = editForm.watch("description");
   const watchedAssignments = watch("assignedEmployees");
 
   useEffect(() => {
@@ -194,9 +196,9 @@ export default function FinanceEventsPage() {
       description: String(row.description || ""),
       startDate: new Date(String(row.startDate)).toISOString().split("T")[0],
       endDate: new Date(String(row.endDate)).toISOString().split("T")[0],
-      budgetType: String(row.budgetType),
+      budgetType: String(row.budgetType) as EventEditForm["budgetType"],
       eventBudget: row.eventBudget ? Number(row.eventBudget) : undefined,
-      status: String(row.status || "ACTIVE"),
+      status: String(row.status || "ACTIVE") as EventEditForm["status"],
     });
   };
 
@@ -236,70 +238,96 @@ export default function FinanceEventsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Events</h1>
+      <PageHeader title="Events" />
 
       <Card>
         <h2 className="mb-4 font-semibold">Create Event</h2>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <Label>Event Name</Label>
+              <Label required>Event Name</Label>
               <Input {...register("name")} />
               {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>}
             </div>
             <div>
-              <Label>Budget Type</Label>
+              <Label required>Budget Type</Label>
               <Select {...register("budgetType")}>
                 <option value={BUDGET_TYPES.PER_EMPLOYEE}>Per Employee</option>
                 <option value={BUDGET_TYPES.PER_EVENT}>Per Event</option>
               </Select>
             </div>
             <div>
-              <Label>Start Date</Label>
+              <Label required>Start Date</Label>
               <Input type="date" {...register("startDate")} />
               {errors.startDate && <p className="mt-1 text-sm text-red-600">{errors.startDate.message}</p>}
             </div>
             <div>
-              <Label>End Date</Label>
+              <Label required>End Date</Label>
               <Input type="date" {...register("endDate")} />
               {errors.endDate && <p className="mt-1 text-sm text-red-600">{errors.endDate.message}</p>}
             </div>
             {budgetType === BUDGET_TYPES.PER_EVENT && (
               <div>
-                <Label>Event Budget (INR)</Label>
-                <Input type="number" step="0.01" {...register("eventBudget")} />
+                <Label required>Event Budget (INR)</Label>
+                <Input type="number" step="0.01" min="0.01" {...register("eventBudget")} />
                 {errors.eventBudget && <p className="mt-1 text-sm text-red-600">{errors.eventBudget.message}</p>}
               </div>
             )}
             <div className="md:col-span-2">
               <Label>Description</Label>
-              <Textarea {...register("description")} />
+              <Textarea {...register("description")} rows={4} placeholder="Optional event description" />
+              <p className={`mt-1 text-xs ${countWords(description) > 250 ? "text-red-600" : "text-slate-500"}`}>
+                {countWords(description)}/250 words
+              </p>
+              {errors.description && (
+                <p className="mt-1 text-sm text-red-600">{errors.description.message}</p>
+              )}
             </div>
           </div>
 
           <div>
-            <Label>Assigned Employees & Pre-approved Budgets</Label>
-            {fields.map((field, index) => (
-              <div key={field.id} className="mt-2 flex flex-wrap gap-2">
-                <Select className="min-w-[200px]" {...register(`assignedEmployees.${index}.employeeId`)}>
-                  <option value="">Select employee</option>
-                  {formAvailableForIndex(index).map((e) => (
-                    <option key={e._id} value={e._id}>{e.name}</option>
-                  ))}
-                </Select>
-                <Input
-                  type="number"
-                  step="0.01"
-                  className="w-40"
-                  placeholder="Budget"
-                  {...register(`assignedEmployees.${index}.preApprovedBudget`)}
-                />
-                {fields.length > 1 && (
-                  <Button type="button" variant="ghost" onClick={() => remove(index)}>Remove</Button>
-                )}
-              </div>
-            ))}
-            {errors.assignedEmployees && (
+            <Label required>Assigned Employees & Pre-approved Budgets</Label>
+            {fields.map((field, index) => {
+              const employeeError = errors.assignedEmployees?.[index]?.employeeId;
+              const budgetError = errors.assignedEmployees?.[index]?.preApprovedBudget;
+
+              return (
+                <div key={field.id} className="mt-2 space-y-1">
+                  <div className="flex flex-wrap items-start gap-2">
+                    <div className="min-w-[200px] flex-1">
+                      <Select {...register(`assignedEmployees.${index}.employeeId`)}>
+                        <option value="">Select employee</option>
+                        {formAvailableForIndex(index).map((e) => (
+                          <option key={e._id} value={e._id}>{e.name}</option>
+                        ))}
+                      </Select>
+                      {employeeError && (
+                        <p className="mt-1 text-sm text-red-600">{employeeError.message}</p>
+                      )}
+                    </div>
+                    <div className="w-40">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        placeholder="Budget"
+                        {...register(`assignedEmployees.${index}.preApprovedBudget`)}
+                      />
+                      {budgetError && (
+                        <p className="mt-1 text-sm text-red-600">{budgetError.message}</p>
+                      )}
+                    </div>
+                    {fields.length > 1 && (
+                      <Button type="button" variant="ghost" onClick={() => remove(index)}>Remove</Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {errors.assignedEmployees?.root && (
+              <p className="mt-1 text-sm text-red-600">{errors.assignedEmployees.root.message}</p>
+            )}
+            {errors.assignedEmployees && !Array.isArray(errors.assignedEmployees) && (
               <p className="mt-1 text-sm text-red-600">{errors.assignedEmployees.message}</p>
             )}
             <Button
@@ -442,7 +470,7 @@ export default function FinanceEventsPage() {
       </Modal>
 
       <Modal open={!!editAssignment} onClose={() => setEditAssignment(null)} title="Edit Budget">
-        <Label>Pre-approved Budget (INR)</Label>
+        <Label required>Pre-approved Budget (INR)</Label>
         <Input
           type="number"
           step="0.01"
@@ -472,11 +500,11 @@ export default function FinanceEventsPage() {
       >
         <form onSubmit={editForm.handleSubmit(saveEdit)} className="space-y-4">
           <div>
-            <Label>Event Name</Label>
+            <Label required>Event Name</Label>
             <Input {...editForm.register("name", { required: true })} />
           </div>
           <div>
-            <Label>Budget Type</Label>
+            <Label required>Budget Type</Label>
             <Select {...editForm.register("budgetType")}>
               <option value={BUDGET_TYPES.PER_EMPLOYEE}>Per Employee</option>
               <option value={BUDGET_TYPES.PER_EVENT}>Per Event</option>
@@ -484,22 +512,25 @@ export default function FinanceEventsPage() {
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label>Start Date</Label>
+              <Label required>Start Date</Label>
               <Input type="date" {...editForm.register("startDate", { required: true })} />
             </div>
             <div>
-              <Label>End Date</Label>
+              <Label required>End Date</Label>
               <Input type="date" {...editForm.register("endDate", { required: true })} />
             </div>
           </div>
           {editBudgetType === BUDGET_TYPES.PER_EVENT && (
             <div>
-              <Label>Event Budget (INR)</Label>
-              <Input type="number" step="0.01" {...editForm.register("eventBudget")} />
+              <Label required>Event Budget (INR)</Label>
+              <Input type="number" step="0.01" min="0.01" {...editForm.register("eventBudget")} />
+              {editForm.formState.errors.eventBudget && (
+                <p className="mt-1 text-sm text-red-600">{editForm.formState.errors.eventBudget.message}</p>
+              )}
             </div>
           )}
           <div>
-            <Label>Status</Label>
+            <Label required>Status</Label>
             <Select {...editForm.register("status")}>
               <option value="ACTIVE">Active</option>
               <option value="CLOSED">Closed</option>
@@ -507,7 +538,13 @@ export default function FinanceEventsPage() {
           </div>
           <div>
             <Label>Description</Label>
-            <Textarea {...editForm.register("description")} />
+            <Textarea {...editForm.register("description")} rows={4} />
+            <p className={`mt-1 text-xs ${countWords(editDescription) > 250 ? "text-red-600" : "text-slate-500"}`}>
+              {countWords(editDescription)}/250 words
+            </p>
+            {editForm.formState.errors.description && (
+              <p className="mt-1 text-sm text-red-600">{editForm.formState.errors.description.message}</p>
+            )}
           </div>
           {editError && <p className="text-sm text-red-600">{editError}</p>}
           <div className="flex gap-2">

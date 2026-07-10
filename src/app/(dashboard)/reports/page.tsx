@@ -116,6 +116,24 @@ export default function ReportsPage() {
     }
   };
 
+  const clearFilters = () => {
+    setReportType("org");
+    setEventId("");
+    setEmployeeId("");
+    setExpenseView("all");
+    setReportRows([]);
+    setReportTotal(0);
+    setReportLoaded(false);
+    setReportError("");
+  };
+
+  const hasActiveFilters =
+    reportType !== "org" ||
+    Boolean(eventId) ||
+    Boolean(employeeId) ||
+    expenseView !== "all" ||
+    reportLoaded;
+
   const rowHeaders = useMemo(
     () => (reportRows.length ? Object.keys(reportRows[0]) : []),
     [reportRows]
@@ -164,7 +182,7 @@ export default function ReportsPage() {
         <h2 className="mb-4 font-semibold">Export Reports</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div>
-            <Label>Report Type</Label>
+            <Label required>Report Type</Label>
             <Select
               value={reportType}
               onChange={(e) => {
@@ -180,7 +198,7 @@ export default function ReportsPage() {
           </div>
           {reportType === "event" && (
             <div>
-              <Label>Event</Label>
+              <Label required>Event</Label>
               <Select
                 value={eventId}
                 onChange={(e) => {
@@ -213,7 +231,7 @@ export default function ReportsPage() {
           )}
           {reportType === "employee" && (
             <div>
-              <Label>Employee</Label>
+              <Label required>Employee</Label>
               <Select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}>
                 <option value="">Select employee</option>
                 {employees.map((e) => <option key={e._id} value={e._id}>{e.name}</option>)}
@@ -226,6 +244,11 @@ export default function ReportsPage() {
           <Button onClick={loadReport} disabled={loadingReport}>
             {loadingReport ? "Loading..." : "Load Report"}
           </Button>
+          {hasActiveFilters && (
+            <Button type="button" variant="ghost" onClick={clearFilters}>
+              Clear All
+            </Button>
+          )}
           {reportLoaded && (
             <>
               <Button

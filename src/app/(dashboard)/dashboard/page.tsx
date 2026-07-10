@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { getNavForPermissions } from "@/lib/navigation";
 import { ModuleGrid, WelcomeBanner } from "@/components/layout/ThunderModules";
 import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { formatINR } from "@/lib/utils";
 
@@ -75,13 +76,18 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="mb-6">
+      <div className="mb-6 flex flex-wrap items-center gap-2">
         <Input
           placeholder="Search modules..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="rounded-2xl py-3.5 pl-4"
+          className="min-w-0 flex-1 rounded-2xl py-3.5 pl-4"
         />
+        {search.trim() && (
+          <Button type="button" variant="ghost" onClick={() => setSearch("")}>
+            Clear All
+          </Button>
+        )}
       </div>
 
       <div className="space-y-8">

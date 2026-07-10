@@ -28,6 +28,31 @@ interface RoleOption {
   slug: string;
 }
 
+const defaultCreateValues: UserForm = {
+  name: "",
+  phone: "",
+  password: "",
+  roleSlug: ROLES.EMPLOYEE,
+  status: "ACTIVE",
+};
+
+function EyeIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+    </svg>
+  );
+}
+
+function EyeOffIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858 3.029a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+    </svg>
+  );
+}
+
 export default function AdminUsersPage() {
   const { user } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
@@ -41,6 +66,7 @@ export default function AdminUsersPage() {
     newPassword: string;
   } | null>(null);
   const [editError, setEditError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     fetch("/api/roles?active=true&limit=100")
@@ -52,11 +78,15 @@ export default function AdminUsersPage() {
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<UserForm>({
     resolver: zodResolver(userCreateSchema),
-    defaultValues: { roleSlug: ROLES.EMPLOYEE, status: "ACTIVE" },
+    defaultValues: defaultCreateValues,
   });
+
+  const phoneField = register("phone");
+  const passwordField = register("password");
 
   const editForm = useForm<UserEditForm>({
     resolver: zodResolver(userUpdateSchema),
@@ -78,7 +108,8 @@ export default function AdminUsersPage() {
       setFormError(json.message || "Failed to create user");
       return;
     }
-    reset({ roleSlug: ROLES.EMPLOYEE, status: "ACTIVE" });
+    reset(defaultCreateValues);
+    setShowPassword(false);
     setRefreshKey((k) => k + 1);
   };
 
@@ -141,22 +172,58 @@ export default function AdminUsersPage() {
         <h2 className="mb-4 font-semibold">Create User</h2>
         <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 md:grid-cols-2">
           <div>
-            <Label>Name</Label>
+            <Label required>Name</Label>
             <Input {...register("name")} />
             {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>}
           </div>
           <div>
-            <Label>Phone</Label>
-            <Input {...register("phone")} placeholder="10-digit number" />
+            <Label required>Phone</Label>
+            <Input
+              type="tel"
+              inputMode="numeric"
+              autoComplete="tel"
+              maxLength={10}
+              placeholder="10-digit number"
+              name={phoneField.name}
+              ref={phoneField.ref}
+              onBlur={phoneField.onBlur}
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
+                e.target.value = digits;
+                setValue("phone", digits, { shouldValidate: true, shouldDirty: true });
+              }}
+            />
             {errors.phone && <p className="mt-1 text-sm text-red-600">{errors.phone.message}</p>}
           </div>
           <div>
-            <Label>Password</Label>
-            <Input type="password" {...register("password")} />
+            <Label required>Password</Label>
+            <div className="relative">
+              <Input
+                type={showPassword ? "text" : "password"}
+                autoComplete="new-password"
+                className="pr-11"
+                name={passwordField.name}
+                ref={passwordField.ref}
+                onBlur={passwordField.onBlur}
+                onChange={passwordField.onChange}
+              />
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-slate-500 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)]"
+                onClick={() => setShowPassword((visible) => !visible)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? (
+                  <EyeOffIcon className="h-5 w-5" />
+                ) : (
+                  <EyeIcon className="h-5 w-5" />
+                )}
+              </button>
+            </div>
             {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>}
           </div>
           <div>
-            <Label>Role</Label>
+            <Label required>Role</Label>
             <Select {...register("roleSlug")}>
               {allowedRoles.map((r) => (
                 <option key={r.slug} value={r.slug}>{r.name}</option>
@@ -222,14 +289,14 @@ export default function AdminUsersPage() {
       <Modal open={!!editUser} onClose={() => setEditUser(null)} title="Edit User">
         <form onSubmit={editForm.handleSubmit(saveEdit)} className="space-y-4">
           <div>
-            <Label>Name</Label>
+            <Label required>Name</Label>
             <Input {...editForm.register("name")} />
             {editForm.formState.errors.name && (
               <p className="mt-1 text-sm text-red-600">{editForm.formState.errors.name.message}</p>
             )}
           </div>
           <div>
-            <Label>Role</Label>
+            <Label required>Role</Label>
             <Select {...editForm.register("roleSlug")}>
               {allowedRoles.map((r) => (
                 <option key={r.slug} value={r.slug}>{r.name}</option>

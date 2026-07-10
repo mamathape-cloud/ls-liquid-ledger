@@ -22,10 +22,12 @@ export function Modal({ open, title, onClose, children }: ModalProps) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-        <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
-        <div className="mt-4">{children}</div>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:items-center">
+      <div className="my-auto flex w-full max-w-md max-h-[calc(100vh-2rem)] flex-col rounded-xl bg-white shadow-xl">
+        <div className="shrink-0 border-b border-[var(--border)] px-6 py-4">
+          <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">{children}</div>
       </div>
     </div>
   );

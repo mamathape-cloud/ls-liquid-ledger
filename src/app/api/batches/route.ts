@@ -27,12 +27,12 @@ export async function GET(request: Request) {
       ...buildTextSearch(search, ["batchId"]),
     };
 
-    if (filters.status) query.status = filters.status;
-    if (filters.eventId) query.eventId = filters.eventId;
-
-    if (session.roleSlug === ROLES.DIRECTOR) {
+    if (filters.status) {
+      query.status = filters.status;
+    } else if (session.roleSlug === ROLES.DIRECTOR) {
       query.status = { $ne: BATCH_STATUSES.DRAFT };
     }
+    if (filters.eventId) query.eventId = filters.eventId;
 
     const skip = (page - 1) * limit;
     const [batches, total] = await Promise.all([

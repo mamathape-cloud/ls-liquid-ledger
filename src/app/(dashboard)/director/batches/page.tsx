@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DataTable } from "@/components/DataTable";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -27,6 +27,12 @@ interface BatchClaim {
   categoryId?: { name?: string };
 }
 
+const DIRECTOR_BATCH_STATUS_OPTIONS = [
+  BATCH_STATUSES.SUBMITTED,
+  BATCH_STATUSES.DIRECTOR_APPROVED,
+  BATCH_STATUSES.DIRECTOR_REJECTED,
+] as const;
+
 export default function DirectorBatchesPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [reviewBatch, setReviewBatch] = useState<Record<string, unknown> | null>(null);
@@ -35,9 +41,11 @@ export default function DirectorBatchesPage() {
   const [viewClaims, setViewClaims] = useState<BatchClaim[]>([]);
   const [selectedClaimIds, setSelectedClaimIds] = useState<string[]>([]);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [rejectionSuggestions, setRejectionSuggestions] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [loadingClaims, setLoadingClaims] = useState(false);
   const [loadingView, setLoadingView] = useState(false);
+  const reviewSectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!reviewBatch) {
@@ -68,6 +76,27 @@ export default function DirectorBatchesPage() {
       .finally(() => setLoadingView(false));
   }, [viewBatch]);
 
+  useEffect(() => {
+    if (!reviewBatch) return;
+    const timer = setTimeout(() => {
+      reviewSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [reviewBatch]);
+
+  useEffect(() => {
+    if (!rejectionReason || rejectionReason.length < 2) {
+      setRejectionSuggestions([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      fetch(`/api/claims/reasons?type=rejection&q=${encodeURIComponent(rejectionReason)}`)
+        .then((r) => r.json())
+        .then((d) => setRejectionSuggestions(d.suggestions || []));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [rejectionReason]);
+
   const toggleClaim = (id: string) => {
     setSelectedClaimIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
@@ -76,6 +105,13 @@ export default function DirectorBatchesPage() {
 
   const selectAll = () => {
     setSelectedClaimIds(batchClaims.map((c) => c._id));
+  };
+
+  const openReview = (row: Record<string, unknown>) => {
+    setReviewBatch(row);
+    setRejectionReason("");
+    setRejectionSuggestions([]);
+    setError("");
   };
 
   const submitReview = async () => {
@@ -103,8 +139,12 @@ export default function DirectorBatchesPage() {
     }
     setReviewBatch(null);
     setRejectionReason("");
+    setRejectionSuggestions([]);
     setRefreshKey((k) => k + 1);
   };
+
+  const rejectedCount = batchClaims.length - selectedClaimIds.length;
+  const needsRejectionReason = rejectedCount > 0;
 
   return (
     <div className="space-y-6">
@@ -113,6 +153,16 @@ export default function DirectorBatchesPage() {
         <DataTable
           endpoint="/api/batches"
           refreshKey={refreshKey}
+          filters={[
+            {
+              key: "status",
+              label: "All Status",
+              options: DIRECTOR_BATCH_STATUS_OPTIONS.map((s) => ({
+                label: formatStatus(s),
+                value: s,
+              })),
+            },
+          ]}
           columns={[
             { key: "batchId", header: "Batch ID" },
             { key: "eventName", header: "Event" },
@@ -137,8 +187,7 @@ export default function DirectorBatchesPage() {
                       variant="secondary"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setReviewBatch(r);
-                        setError("");
+                        openReview(r);
                       }}
                     >
                       Review
@@ -192,6 +241,7 @@ export default function DirectorBatchesPage() {
       </Modal>
 
       {reviewBatch && (
+        <div ref={reviewSectionRef} className="scroll-mt-6">
         <Card>
           <h2 className="mb-4 font-semibold">Review Batch {String(reviewBatch.batchId)}</h2>
           <p className="mb-4 text-sm text-slate-600">
@@ -229,19 +279,35 @@ export default function DirectorBatchesPage() {
             </div>
           )}
 
-          {batchClaims.length - selectedClaimIds.length > 0 && (
-            <div className="mt-4">
-              <Label>
-                Rejection Reason for {batchClaims.length - selectedClaimIds.length} unselected claim(s)
+          {needsRejectionReason && (
+            <div className="relative mt-4">
+              <Label required>
+                {selectedClaimIds.length === 0
+                  ? "Rejection Reason (rejecting all claims)"
+                  : `Rejection Reason for ${rejectedCount} unselected claim(s)`}
               </Label>
-              <Textarea value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} />
-            </div>
-          )}
-
-          {selectedClaimIds.length === 0 && (
-            <div className="mt-4">
-              <Label>Rejection Reason (rejecting all claims)</Label>
-              <Textarea value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} />
+              <Textarea
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder="Enter reason for rejection"
+              />
+              {rejectionSuggestions.length > 0 && (
+                <div className="absolute z-10 mt-1 w-full rounded-lg border bg-white shadow">
+                  {rejectionSuggestions.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
+                      onClick={() => {
+                        setRejectionReason(s);
+                        setRejectionSuggestions([]);
+                      }}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -258,6 +324,7 @@ export default function DirectorBatchesPage() {
             <Button variant="ghost" onClick={() => setReviewBatch(null)}>Cancel</Button>
           </div>
         </Card>
+        </div>
       )}
     </div>
   );

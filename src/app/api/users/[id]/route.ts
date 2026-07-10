@@ -65,6 +65,15 @@ export async function PATCH(
       return jsonOk({ user: { _id: user._id.toString(), bankDetails: user.bankDetails } });
     }
 
+    if (body.clearBankDetails === true) {
+      if (!isSelf) {
+        return jsonError("Forbidden", 403);
+      }
+      user.bankDetails = {};
+      await user.save();
+      return jsonOk({ user: { _id: user._id.toString(), bankDetails: user.bankDetails } });
+    }
+
     if (!canManageUsers && !(session.roleSlug === ROLES.FINANCE && canManageRole(session.roleSlug, user.roleSlug))) {
       return jsonError("Forbidden", 403);
     }

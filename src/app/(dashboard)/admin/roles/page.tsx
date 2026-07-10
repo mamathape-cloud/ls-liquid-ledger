@@ -120,7 +120,7 @@ export default function AdminRolesPage() {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <Label>Role Name</Label>
+              <Label required>Role Name</Label>
               <Input
                 {...register("name")}
                 placeholder="e.g. Event Manager"
@@ -134,13 +134,13 @@ export default function AdminRolesPage() {
               {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>}
             </div>
             <div>
-              <Label>Slug</Label>
+              <Label required>Slug</Label>
               <Input {...register("slug")} placeholder="EVENT_MANAGER" />
               {errors.slug && <p className="mt-1 text-sm text-red-600">{errors.slug.message}</p>}
             </div>
           </div>
           <div>
-            <Label className="mb-2 block">Module Access</Label>
+            <Label className="mb-2 block" required>Module Access</Label>
             <ModuleCheckboxGrid
               selected={createModules}
               onChange={(mods) => {
@@ -209,7 +209,7 @@ export default function AdminRolesPage() {
       <Modal open={!!editRole} onClose={() => setEditRole(null)} title="Edit Role">
         <form onSubmit={editForm.handleSubmit(saveEdit)} className="space-y-4">
           <div>
-            <Label>Role Name</Label>
+            <Label required>Role Name</Label>
             <Input {...editForm.register("name")} />
             {editForm.formState.errors.name && (
               <p className="mt-1 text-sm text-red-600">{editForm.formState.errors.name.message}</p>
@@ -217,7 +217,7 @@ export default function AdminRolesPage() {
           </div>
           <p className="text-sm text-slate-500">Slug: {String(editRole?.slug)}</p>
           <div>
-            <Label className="mb-2 block">Module Access</Label>
+            <Label className="mb-2 block" required>Module Access</Label>
             <ModuleCheckboxGrid selected={editModules} onChange={setEditModules} />
           </div>
           <div>

@@ -15,7 +15,7 @@ import { ProofLinks } from "@/components/ProofLinks";
 import { ClaimStatusCell } from "@/components/ClaimStatusCell";
 import { ClaimDetailModal } from "@/components/ClaimDetailModal";
 import { PageHeader } from "@/components/layout/ThunderModules";
-import { formatINR, formatDate, formatStatus } from "@/lib/utils";
+import { formatINR, formatDate, formatStatus, sanitizeClaimAmountInput, validateClaimAmount } from "@/lib/utils";
 import { CLAIM_STATUSES } from "@/lib/constants";
 
 interface FormState {
@@ -80,16 +80,24 @@ export default function EmployeeClaimsPage() {
     const timer = setTimeout(() => {
       fetch(`/api/claims/reasons?q=${encodeURIComponent(reason)}`)
         .then((r) => r.json())
-        .then((d) => setSuggestions(d.suggestions || []));
+        .then((d) => {
+          const items = (d.suggestions || []) as string[];
+          setSuggestions(
+            items.filter((s) => s.toLowerCase() !== reason.trim().toLowerCase())
+          );
+        });
     }, 300);
     return () => clearTimeout(timer);
   }, [reason]);
+
+  const amountField = register("amount");
 
   const onSubmit = async (data: FormState) => {
     setFormError({});
     const fieldErrors: Record<string, string> = {};
     if (!data.eventId) fieldErrors.eventId = "Event is required";
-    if (!data.amount || Number(data.amount) <= 0) fieldErrors.amount = "Valid amount is required";
+    const amountError = validateClaimAmount(data.amount);
+    if (amountError) fieldErrors.amount = amountError;
     if (!data.claimDate) fieldErrors.claimDate = "Claim date is required";
     if (!data.reason.trim()) fieldErrors.reason = "Reason is required";
     if (!data.categoryId) fieldErrors.categoryId = "Category is required";
@@ -137,6 +145,11 @@ export default function EmployeeClaimsPage() {
   const saveEdit = async (data: FormState) => {
     if (!editClaim) return;
     setEditError("");
+    const amountError = validateClaimAmount(data.amount);
+    if (amountError) {
+      setEditError(amountError);
+      return;
+    }
     const formData = new FormData();
     formData.append("amount", data.amount);
     formData.append("claimDate", data.claimDate);
@@ -174,7 +187,7 @@ export default function EmployeeClaimsPage() {
         <h2 className="mb-4 font-semibold">Submit New Claim</h2>
         <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 md:grid-cols-2">
           <div>
-            <Label>Event</Label>
+            <Label required>Event</Label>
             <Select {...register("eventId")}>
               <option value="">Select event</option>
               {events.map((e) => <option key={e._id} value={e._id}>{e.name}</option>)}
@@ -200,7 +213,7 @@ export default function EmployeeClaimsPage() {
             )}
           </div>
           <div>
-            <Label>Category</Label>
+            <Label required>Category</Label>
             <Select {...register("categoryId")}>
               <option value="">Select category</option>
               {categories.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
@@ -208,17 +221,29 @@ export default function EmployeeClaimsPage() {
             {(formError.categoryId || errors.categoryId) && <p className="mt-1 text-sm text-red-600">{formError.categoryId}</p>}
           </div>
           <div>
-            <Label>Amount (INR)</Label>
-            <Input type="number" step="0.01" {...register("amount")} />
+            <Label required>Amount (INR)</Label>
+            <Input
+              type="text"
+              inputMode="decimal"
+              placeholder="0.00"
+              name={amountField.name}
+              ref={amountField.ref}
+              onBlur={amountField.onBlur}
+              onChange={(e) => {
+                const sanitized = sanitizeClaimAmountInput(e.target.value);
+                e.target.value = sanitized;
+                setValue("amount", sanitized, { shouldDirty: true });
+              }}
+            />
             {formError.amount && <p className="mt-1 text-sm text-red-600">{formError.amount}</p>}
           </div>
           <div>
-            <Label>Claim Date</Label>
+            <Label required>Claim Date</Label>
             <Input type="date" {...register("claimDate")} />
             {formError.claimDate && <p className="mt-1 text-sm text-red-600">{formError.claimDate}</p>}
           </div>
           <div className="relative md:col-span-2">
-            <Label>Reason / Purpose</Label>
+            <Label required>Reason / Purpose</Label>
             <Textarea {...register("reason")} placeholder="Describe the expense" />
             {suggestions.length > 0 && (
               <div className="absolute z-10 mt-1 w-full rounded-lg border bg-white shadow">
@@ -227,7 +252,10 @@ export default function EmployeeClaimsPage() {
                     key={s}
                     type="button"
                     className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
-                    onClick={() => setValue("reason", s)}
+                    onClick={() => {
+                      setValue("reason", s);
+                      setSuggestions([]);
+                    }}
                   >
                     {s}
                   </button>
@@ -237,7 +265,7 @@ export default function EmployeeClaimsPage() {
             {formError.reason && <p className="mt-1 text-sm text-red-600">{formError.reason}</p>}
           </div>
           <div className="md:col-span-2">
-            <Label>Proof Attachments (PDF, DOCX, images)</Label>
+            <Label required>Proof Attachments (PDF, DOCX, images)</Label>
             <Input
               type="file"
               multiple
@@ -254,20 +282,27 @@ export default function EmployeeClaimsPage() {
       </Card>
 
       <Card>
-        <div className="mb-4 flex flex-wrap items-end gap-3">
-          <div className="w-full sm:max-w-[180px]">
-            <Label>From Date</Label>
-            <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-          </div>
-          <div className="w-full sm:max-w-[180px]">
-            <Label>To Date</Label>
-            <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-          </div>
-        </div>
         <DataTable
           endpoint="/api/claims"
           exportTable="claims"
           refreshKey={refreshKey}
+          externalFiltersActive={Boolean(dateFrom || dateTo)}
+          onClearExternalFilters={() => {
+            setDateFrom("");
+            setDateTo("");
+          }}
+          filterSlot={
+            <>
+              <div className="w-full sm:max-w-[180px]">
+                <Label>From Date</Label>
+                <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+              </div>
+              <div className="w-full sm:max-w-[180px]">
+                <Label>To Date</Label>
+                <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+              </div>
+            </>
+          }
           extraParams={{
             ...(dateFrom ? { "filter.dateFrom": dateFrom } : {}),
             ...(dateTo ? { "filter.dateTo": dateTo } : {}),
@@ -335,15 +370,26 @@ export default function EmployeeClaimsPage() {
       <Modal open={!!editClaim} onClose={() => setEditClaim(null)} title={`Edit Claim ${String(editClaim?.claimId || "")}`}>
         <form onSubmit={editForm.handleSubmit(saveEdit)} className="space-y-4">
           <div>
-            <Label>Amount (INR)</Label>
-            <Input type="number" step="0.01" {...editForm.register("amount")} />
+            <Label required>Amount (INR)</Label>
+            <Input
+              type="text"
+              inputMode="decimal"
+              placeholder="0.00"
+              {...editForm.register("amount", {
+                onChange: (e) => {
+                  const sanitized = sanitizeClaimAmountInput(e.target.value);
+                  e.target.value = sanitized;
+                  editForm.setValue("amount", sanitized, { shouldDirty: true });
+                },
+              })}
+            />
           </div>
           <div>
-            <Label>Claim Date</Label>
+            <Label required>Claim Date</Label>
             <Input type="date" {...editForm.register("claimDate")} />
           </div>
           <div>
-            <Label>Category</Label>
+            <Label required>Category</Label>
             <Select {...editForm.register("categoryId")}>
               {categories.map((c) => (
                 <option key={c._id} value={c._id}>{c.name}</option>
@@ -351,7 +397,7 @@ export default function EmployeeClaimsPage() {
             </Select>
           </div>
           <div>
-            <Label>Reason</Label>
+            <Label required>Reason</Label>
             <Textarea {...editForm.register("reason")} />
           </div>
           <div>

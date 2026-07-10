@@ -8,12 +8,27 @@ export async function GET(request: Request) {
     await requireAuth();
     const { searchParams } = new URL(request.url);
     const q = searchParams.get("q")?.trim() || "";
+    const type = searchParams.get("type")?.trim() || "claim";
 
     if (!q || q.length < 2) {
       return jsonOk({ suggestions: [] });
     }
 
     await connectDB();
+
+    if (type === "rejection") {
+      const [financeReasons, directorReasons] = await Promise.all([
+        Claim.find({ financeRejectionReason: { $regex: q, $options: "i" } })
+          .distinct("financeRejectionReason"),
+        Claim.find({ directorRejectionReason: { $regex: q, $options: "i" } })
+          .distinct("directorRejectionReason"),
+      ]);
+      const suggestions = [...new Set([...financeReasons, ...directorReasons])]
+        .filter(Boolean)
+        .slice(0, 10);
+      return jsonOk({ suggestions });
+    }
+
     const claims = await Claim.find({
       reason: { $regex: q, $options: "i" },
     })

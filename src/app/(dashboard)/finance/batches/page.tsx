@@ -107,7 +107,7 @@ export default function FinanceBatchesPage() {
       <Card>
         <h2 className="mb-4 font-semibold">Club Claims for Director Approval</h2>
         <div className="mb-4 max-w-md">
-          <Label>Select Event</Label>
+          <Label required>Select Event</Label>
           <Select value={eventId} onChange={(e) => setEventId(e.target.value)}>
             <option value="">Choose event</option>
             {events.map((e) => (

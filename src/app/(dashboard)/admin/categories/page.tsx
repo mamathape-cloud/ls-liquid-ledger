@@ -99,7 +99,7 @@ export default function AdminCategoriesPage() {
         <h2 className="mb-4 font-semibold">Add Category</h2>
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-wrap items-end gap-4">
           <div className="min-w-[240px] flex-1">
-            <Label>Category Name</Label>
+            <Label required>Category Name</Label>
             <Input {...register("name")} placeholder="e.g. Travel, Food" />
             {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>}
           </div>
@@ -154,7 +154,7 @@ export default function AdminCategoriesPage() {
       <Modal open={!!editCategory} onClose={() => setEditCategory(null)} title="Edit Category">
         <form onSubmit={editForm.handleSubmit(saveEdit)} className="space-y-4">
           <div>
-            <Label>Category Name</Label>
+            <Label required>Category Name</Label>
             <Input {...editForm.register("name")} />
             {editForm.formState.errors.name && (
               <p className="mt-1 text-sm text-red-600">{editForm.formState.errors.name.message}</p>
