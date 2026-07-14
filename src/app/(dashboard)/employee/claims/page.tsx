@@ -69,7 +69,11 @@ export default function EmployeeClaimsPage() {
     claimedAmount: number;
     remaining: number;
   } | null>(null);
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [successClaimId, setSuccessClaimId] = useState("");
+  const [proofInputKey, setProofInputKey] = useState(0);
   const reasonBoxRef = useRef<HTMLDivElement>(null);
+  const proofInputRef = useRef<HTMLInputElement>(null);
 
   const { register, handleSubmit, watch, reset, setValue, formState: { errors } } = useForm<FormState>({
     defaultValues: emptyForm,
@@ -135,6 +139,10 @@ export default function EmployeeClaimsPage() {
     setFormError({});
     setSuggestions([]);
     setEventBudget(null);
+    setProofInputKey((k) => k + 1);
+    if (proofInputRef.current) {
+      proofInputRef.current.value = "";
+    }
   };
 
   const validateNewClaimDate = (claimDate: string, eventId: string) => {
@@ -180,6 +188,8 @@ export default function EmployeeClaimsPage() {
       return;
     }
     clearForm();
+    setSuccessClaimId(String(json.claim?.claimId || ""));
+    setSuccessOpen(true);
     setRefreshKey((k) => k + 1);
   };
 
@@ -347,6 +357,8 @@ export default function EmployeeClaimsPage() {
           <div className="md:col-span-2">
             <Label required>Proof Attachments (PDF, DOCX, images)</Label>
             <Input
+              key={proofInputKey}
+              ref={proofInputRef}
               type="file"
               multiple
               accept=".pdf,.doc,.docx,image/*"
@@ -533,6 +545,19 @@ export default function EmployeeClaimsPage() {
             <Button type="button" variant="ghost" onClick={() => setEditClaim(null)}>Cancel</Button>
           </div>
         </form>
+      </Modal>
+
+      <Modal open={successOpen} onClose={() => setSuccessOpen(false)} title="Claims Submitted">
+        <p className="text-sm text-slate-600">
+          {successClaimId
+            ? `Your claim ${successClaimId} has been submitted successfully.`
+            : "Your claim has been submitted successfully."}
+        </p>
+        <div className="mt-4 flex justify-end">
+          <Button type="button" onClick={() => setSuccessOpen(false)}>
+            OK
+          </Button>
+        </div>
       </Modal>
 
       <ConfirmDialog

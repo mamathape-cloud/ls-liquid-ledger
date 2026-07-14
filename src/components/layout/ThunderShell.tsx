@@ -96,7 +96,7 @@ export function ThunderShell({ user, children }: ThunderShellProps) {
         {children}
       </main>
 
-      <nav className="sticky bottom-0 z-30 border-t border-[var(--border)] bg-white px-2 py-2 safe-area-pb">
+      <nav className="sticky bottom-0 z-30 shrink-0 border-t border-[var(--border)] bg-white px-2 py-2 safe-area-pb">
         <div className="flex items-center justify-around">
           {bottomNav.map((item) => (
             <BottomNavLink key={item.href} item={item} active={pathname === item.href} badge={item.href === "/notifications" ? unreadCount : 0} />

@@ -65,7 +65,7 @@ export default function SearchPage() {
               placeholder="e.g. LL-2026-000123"
             />
             {suggestions.length > 0 && (
-              <div className="absolute z-10 mt-1 w-full rounded-lg border bg-white shadow">
+              <div className="absolute z-40 mt-1 max-h-[min(16rem,calc(100dvh-14rem))] w-full overflow-y-auto overscroll-contain rounded-lg border bg-white shadow-lg">
                 {suggestions.map((s) => (
                   <button
                     key={s}
