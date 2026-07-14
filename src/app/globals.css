@@ -66,3 +66,18 @@ option {
 .safe-area-pb {
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
 }
+
+/* Native date inputs: avoid layout shift / remount issues on iOS & Android */
+input.date-input,
+input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 2.75rem;
+  position: relative;
+  z-index: 1;
+}
+
+input.date-input::-webkit-date-and-time-value,
+input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+}

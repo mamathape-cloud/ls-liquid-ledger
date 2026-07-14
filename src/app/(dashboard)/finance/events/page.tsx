@@ -8,6 +8,7 @@ import { z } from "zod";
 import { DataTable } from "@/components/DataTable";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { DateInput } from "@/components/ui/DateInput";
 import { Label } from "@/components/ui/Label";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
@@ -16,7 +17,7 @@ import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PageHeader } from "@/components/layout/ThunderModules";
 import { BUDGET_TYPES } from "@/lib/constants";
-import { formatINR, formatDate, formatStatus } from "@/lib/utils";
+import { formatINR, formatDate, formatStatus, sanitizeClaimAmountInput } from "@/lib/utils";
 
 type EventForm = z.input<typeof eventSchema>;
 type EventEditForm = z.input<typeof eventEditFormSchema>;
@@ -59,12 +60,14 @@ export default function FinanceEventsPage() {
     control,
     watch,
     reset,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<EventForm>({
     resolver: zodResolver(eventSchema),
     defaultValues: {
       budgetType: BUDGET_TYPES.PER_EMPLOYEE,
-      assignedEmployees: [{ employeeId: "", preApprovedBudget: 0 }],
+      allowFutureDatedClaims: false,
+      assignedEmployees: [{ employeeId: "", preApprovedBudget: undefined as unknown as number }],
     },
   });
 
@@ -198,6 +201,7 @@ export default function FinanceEventsPage() {
       endDate: new Date(String(row.endDate)).toISOString().split("T")[0],
       budgetType: String(row.budgetType) as EventEditForm["budgetType"],
       eventBudget: row.eventBudget ? Number(row.eventBudget) : undefined,
+      allowFutureDatedClaims: Boolean(row.allowFutureDatedClaims),
       status: String(row.status || "ACTIVE") as EventEditForm["status"],
     });
   };
@@ -258,21 +262,55 @@ export default function FinanceEventsPage() {
             </div>
             <div>
               <Label required>Start Date</Label>
-              <Input type="date" {...register("startDate")} />
+              <DateInput
+                value={watch("startDate") || ""}
+                onChange={(v) => setValue("startDate", v, { shouldValidate: true, shouldDirty: true })}
+              />
               {errors.startDate && <p className="mt-1 text-sm text-red-600">{errors.startDate.message}</p>}
             </div>
             <div>
               <Label required>End Date</Label>
-              <Input type="date" {...register("endDate")} />
+              <DateInput
+                value={watch("endDate") || ""}
+                onChange={(v) => setValue("endDate", v, { shouldValidate: true, shouldDirty: true })}
+              />
               {errors.endDate && <p className="mt-1 text-sm text-red-600">{errors.endDate.message}</p>}
             </div>
             {budgetType === BUDGET_TYPES.PER_EVENT && (
               <div>
                 <Label required>Event Budget (INR)</Label>
-                <Input type="number" step="0.01" min="0.01" {...register("eventBudget")} />
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  min="0.01"
+                  {...register("eventBudget", {
+                    onChange: (e) => {
+                      const sanitized = sanitizeClaimAmountInput(e.target.value);
+                      e.target.value = sanitized;
+                      setValue("eventBudget", sanitized as unknown as number, { shouldValidate: true });
+                    },
+                  })}
+                />
                 {errors.eventBudget && <p className="mt-1 text-sm text-red-600">{errors.eventBudget.message}</p>}
               </div>
             )}
+            <div className="md:col-span-2 flex items-start gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-3">
+              <input
+                id="allowFutureDatedClaims"
+                type="checkbox"
+                className="mt-1 h-4 w-4"
+                {...register("allowFutureDatedClaims")}
+              />
+              <div>
+                <Label htmlFor="allowFutureDatedClaims" className="mb-0">
+                  Allow future dated claims
+                </Label>
+                <p className="text-xs text-slate-500">
+                  If unchecked, employees cannot select a claim date after today.
+                </p>
+              </div>
+            </div>
             <div className="md:col-span-2">
               <Label>Description</Label>
               <Textarea {...register("description")} rows={4} placeholder="Optional event description" />
@@ -307,11 +345,20 @@ export default function FinanceEventsPage() {
                     </div>
                     <div className="w-40">
                       <Input
-                        type="number"
-                        step="0.01"
-                        min="0.01"
+                        type="text"
+                        inputMode="decimal"
                         placeholder="Budget"
-                        {...register(`assignedEmployees.${index}.preApprovedBudget`)}
+                        {...register(`assignedEmployees.${index}.preApprovedBudget`, {
+                          onChange: (e) => {
+                            const sanitized = sanitizeClaimAmountInput(e.target.value);
+                            e.target.value = sanitized;
+                            setValue(
+                              `assignedEmployees.${index}.preApprovedBudget`,
+                              sanitized as unknown as number,
+                              { shouldValidate: true }
+                            );
+                          },
+                        })}
                       />
                       {budgetError && (
                         <p className="mt-1 text-sm text-red-600">{budgetError.message}</p>
@@ -334,7 +381,7 @@ export default function FinanceEventsPage() {
               type="button"
               variant="secondary"
               className="mt-2"
-              onClick={() => append({ employeeId: "", preApprovedBudget: 0 })}
+              onClick={() => append({ employeeId: "", preApprovedBudget: undefined as unknown as number })}
             >
               Add Employee
             </Button>
@@ -452,12 +499,12 @@ export default function FinanceEventsPage() {
                 ))}
               </Select>
               <Input
-                type="number"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 className="w-32"
                 placeholder="Budget"
                 value={addBudget}
-                onChange={(e) => setAddBudget(e.target.value)}
+                onChange={(e) => setAddBudget(sanitizeClaimAmountInput(e.target.value))}
               />
               <Button variant="secondary" onClick={addEmployeeToEvent}>Add</Button>
             </div>
@@ -472,10 +519,11 @@ export default function FinanceEventsPage() {
       <Modal open={!!editAssignment} onClose={() => setEditAssignment(null)} title="Edit Budget">
         <Label required>Pre-approved Budget (INR)</Label>
         <Input
-          type="number"
-          step="0.01"
+          type="text"
+          inputMode="decimal"
+          placeholder="0.00"
           value={editBudget}
-          onChange={(e) => setEditBudget(e.target.value)}
+          onChange={(e) => setEditBudget(sanitizeClaimAmountInput(e.target.value))}
         />
         <div className="mt-4 flex gap-2">
           <Button onClick={saveEditAssignment}>Save</Button>
@@ -513,22 +561,58 @@ export default function FinanceEventsPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label required>Start Date</Label>
-              <Input type="date" {...editForm.register("startDate", { required: true })} />
+              <DateInput
+                value={editForm.watch("startDate") || ""}
+                onChange={(v) => editForm.setValue("startDate", v, { shouldValidate: true, shouldDirty: true })}
+              />
             </div>
             <div>
               <Label required>End Date</Label>
-              <Input type="date" {...editForm.register("endDate", { required: true })} />
+              <DateInput
+                value={editForm.watch("endDate") || ""}
+                onChange={(v) => editForm.setValue("endDate", v, { shouldValidate: true, shouldDirty: true })}
+              />
             </div>
           </div>
           {editBudgetType === BUDGET_TYPES.PER_EVENT && (
             <div>
               <Label required>Event Budget (INR)</Label>
-              <Input type="number" step="0.01" min="0.01" {...editForm.register("eventBudget")} />
+              <Input
+                type="text"
+                inputMode="decimal"
+                placeholder="0.00"
+                min="0.01"
+                {...editForm.register("eventBudget", {
+                  onChange: (e) => {
+                    const sanitized = sanitizeClaimAmountInput(e.target.value);
+                    e.target.value = sanitized;
+                    editForm.setValue("eventBudget", sanitized as unknown as number, {
+                      shouldValidate: true,
+                    });
+                  },
+                })}
+              />
               {editForm.formState.errors.eventBudget && (
                 <p className="mt-1 text-sm text-red-600">{editForm.formState.errors.eventBudget.message}</p>
               )}
             </div>
           )}
+          <div className="flex items-start gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-3">
+            <input
+              id="editAllowFutureDatedClaims"
+              type="checkbox"
+              className="mt-1 h-4 w-4"
+              {...editForm.register("allowFutureDatedClaims")}
+            />
+            <div>
+              <Label htmlFor="editAllowFutureDatedClaims" className="mb-0">
+                Allow future dated claims
+              </Label>
+              <p className="text-xs text-slate-500">
+                If unchecked, employees cannot select a claim date after today.
+              </p>
+            </div>
+          </div>
           <div>
             <Label required>Status</Label>
             <Select {...editForm.register("status")}>

@@ -8,7 +8,11 @@ import { z } from "zod";
 
 const addEmployeeSchema = z.object({
   employeeId: z.string().min(1, "Employee is required"),
-  preApprovedBudget: z.coerce.number().min(0, "Budget must be 0 or more"),
+  preApprovedBudget: z.coerce
+    .number({ error: "Valid budget is required" })
+    .refine((n) => Number.isFinite(n) && n > 0, {
+      message: "Budget must be greater than 0",
+    }),
 });
 
 export async function POST(

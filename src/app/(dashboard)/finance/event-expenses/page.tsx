@@ -18,7 +18,7 @@ interface EventOption {
 
 const emptyHead = (): ExpenseHead => ({
   name: "",
-  amount: 0,
+  amount: undefined,
   subHeads: [],
 });
 
@@ -96,6 +96,10 @@ export default function EventExpensesPage() {
       setError("All sub-head names are required");
       return false;
     }
+    if (draft.subHeads.some((s) => s.amount === undefined || s.amount < 0 || Number.isNaN(s.amount))) {
+      setError("All sub-head amounts are required");
+      return false;
+    }
     return true;
   };
 
@@ -106,7 +110,7 @@ export default function EventExpensesPage() {
     const normalized: ExpenseHead = {
       name: draft.name.trim(),
       amount: draft.subHeads.length ? undefined : draft.amount,
-      subHeads: draft.subHeads.map((s) => ({ name: s.name.trim(), amount: s.amount })),
+      subHeads: draft.subHeads.map((s) => ({ name: s.name.trim(), amount: s.amount ?? 0 })),
     };
 
     if (editingHeadIndex !== null) {
@@ -142,12 +146,50 @@ export default function EventExpensesPage() {
     if (!eventId) return;
     setSaving(true);
     try {
-      if (next.length === 0) {
-        await persistPlan([]);
-      } else {
-        await persistPlan(next);
-      }
+      await persistPlan(next);
       setSuccess("Head removed");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete");
+      loadPlan(eventId);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteSubHeadFromPlan = async (headIndex: number, subIndex: number) => {
+    setError("");
+    setSuccess("");
+    const head = planHeads[headIndex];
+    if (!head) return;
+
+    const nextSubHeads = head.subHeads.filter((_, i) => i !== subIndex);
+    let nextHeads: ExpenseHead[];
+
+    if (nextSubHeads.length === 0) {
+      // No sub-heads left — remove the whole head
+      nextHeads = planHeads.filter((_, i) => i !== headIndex);
+      if (editingHeadIndex === headIndex) resetDraft();
+    } else {
+      nextHeads = planHeads.map((h, i) =>
+        i === headIndex
+          ? { ...h, subHeads: nextSubHeads, amount: undefined }
+          : h
+      );
+      if (editingHeadIndex === headIndex) {
+        setDraft((prev) => ({
+          ...prev,
+          subHeads: nextSubHeads.map((s) => ({ ...s })),
+          amount: undefined,
+        }));
+      }
+    }
+
+    setPlanHeads(nextHeads);
+    if (!eventId) return;
+    setSaving(true);
+    try {
+      await persistPlan(nextHeads);
+      setSuccess(nextSubHeads.length === 0 ? "Head removed" : "Sub-head removed");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to delete");
       loadPlan(eventId);
@@ -186,7 +228,8 @@ export default function EventExpensesPage() {
   const addSubHead = () => {
     setDraft((prev) => ({
       ...prev,
-      subHeads: [...prev.subHeads, { name: "", amount: 0 }],
+      amount: undefined,
+      subHeads: [...prev.subHeads, { name: "", amount: undefined }],
     }));
   };
 
@@ -261,10 +304,14 @@ export default function EventExpensesPage() {
                         type="number"
                         min={0}
                         step="0.01"
-                        value={draft.amount ?? 0}
-                        onChange={(e) =>
-                          updateDraft({ amount: Number(e.target.value) })
-                        }
+                        placeholder="0"
+                        value={draft.amount === undefined || draft.amount === null ? "" : draft.amount}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          updateDraft({
+                            amount: raw === "" ? undefined : Number(raw),
+                          });
+                        }}
                       />
                     </div>
                   )}
@@ -296,10 +343,14 @@ export default function EventExpensesPage() {
                           type="number"
                           min={0}
                           step="0.01"
-                          value={sub.amount}
-                          onChange={(e) =>
-                            updateSubHead(subIndex, { amount: Number(e.target.value) })
-                          }
+                          placeholder="0"
+                          value={sub.amount === undefined || sub.amount === null ? "" : sub.amount}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            updateSubHead(subIndex, {
+                              amount: raw === "" ? undefined : Number(raw),
+                            });
+                          }}
                         />
                       </div>
                       <Button
@@ -364,7 +415,7 @@ export default function EventExpensesPage() {
                                 <span className="min-w-0 text-right text-sm text-slate-900">
                                   {sub.name}
                                   <span className="mt-0.5 block text-xs text-slate-500">
-                                    {formatINR(sub.amount)}
+                                    {formatINR(sub.amount ?? 0)}
                                   </span>
                                 </span>
                               </div>
@@ -436,7 +487,11 @@ export default function EventExpensesPage() {
                                   <Button
                                     type="button"
                                     variant="danger"
-                                    onClick={() => deleteHead(row.headIndex)}
+                                    onClick={() =>
+                                      row.subIndex === null
+                                        ? deleteHead(row.headIndex)
+                                        : deleteSubHeadFromPlan(row.headIndex, row.subIndex)
+                                    }
                                   >
                                     Delete
                                   </Button>

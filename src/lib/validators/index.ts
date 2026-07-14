@@ -127,6 +127,7 @@ export const eventSchema = z
     endDate: z.string().min(1, "End date is required"),
     budgetType: z.enum([BUDGET_TYPES.PER_EVENT, BUDGET_TYPES.PER_EMPLOYEE]),
     eventBudget: z.coerce.number().min(0).optional(),
+    allowFutureDatedClaims: z.boolean().optional().default(false),
     assignedEmployees: z
       .array(employeeAssignmentSchema)
       .min(1, "Assign at least one employee"),
@@ -153,6 +154,7 @@ export const eventEditFormSchema = z
     endDate: z.string().min(1, "End date is required"),
     budgetType: z.enum([BUDGET_TYPES.PER_EVENT, BUDGET_TYPES.PER_EMPLOYEE]),
     eventBudget: z.coerce.number().min(0).optional(),
+    allowFutureDatedClaims: z.boolean().optional().default(false),
     status: z.enum([EVENT_STATUSES.ACTIVE, EVENT_STATUSES.CLOSED]),
   })
   .refine((data) => new Date(data.endDate) >= new Date(data.startDate), {
@@ -176,6 +178,7 @@ export const eventUpdateSchema = z.object({
   endDate: z.string().min(1).optional(),
   budgetType: z.enum([BUDGET_TYPES.PER_EVENT, BUDGET_TYPES.PER_EMPLOYEE]).optional(),
   eventBudget: z.coerce.number().min(0).optional(),
+  allowFutureDatedClaims: z.boolean().optional(),
   status: z.enum([EVENT_STATUSES.ACTIVE, EVENT_STATUSES.CLOSED]).optional(),
   assignedEmployees: z.array(employeeAssignmentSchema).optional(),
 });

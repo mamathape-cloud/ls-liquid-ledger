@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { DataTable } from "@/components/DataTable";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { DateInput } from "@/components/ui/DateInput";
 import { Label } from "@/components/ui/Label";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
@@ -16,6 +17,7 @@ import { ClaimStatusCell } from "@/components/ClaimStatusCell";
 import { ClaimDetailModal } from "@/components/ClaimDetailModal";
 import { PageHeader } from "@/components/layout/ThunderModules";
 import { formatINR, formatDate, formatStatus, sanitizeClaimAmountInput, validateClaimAmount } from "@/lib/utils";
+import { todayISODate } from "@/lib/date";
 import { CLAIM_STATUSES } from "@/lib/constants";
 
 interface FormState {
@@ -26,9 +28,29 @@ interface FormState {
   categoryId: string;
 }
 
+interface EventOption {
+  _id: string;
+  name: string;
+  allowFutureDatedClaims?: boolean;
+}
+
+interface ProofFile {
+  originalName: string;
+  storedPath: string;
+  mimeType?: string;
+}
+
+const emptyForm: FormState = {
+  eventId: "",
+  amount: "",
+  claimDate: "",
+  reason: "",
+  categoryId: "",
+};
+
 export default function EmployeeClaimsPage() {
   const [refreshKey, setRefreshKey] = useState(0);
-  const [events, setEvents] = useState<{ _id: string; name: string }[]>([]);
+  const [events, setEvents] = useState<EventOption[]>([]);
   const [categories, setCategories] = useState<{ _id: string; name: string }[]>([]);
   const [proofFiles, setProofFiles] = useState<FileList | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -36,6 +58,7 @@ export default function EmployeeClaimsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [editClaim, setEditClaim] = useState<Record<string, unknown> | null>(null);
   const [deleteClaim, setDeleteClaim] = useState<Record<string, unknown> | null>(null);
+  const [keptProofs, setKeptProofs] = useState<ProofFile[]>([]);
   const [editProofFiles, setEditProofFiles] = useState<FileList | null>(null);
   const [editError, setEditError] = useState("");
   const [viewClaimId, setViewClaimId] = useState<string | null>(null);
@@ -46,15 +69,19 @@ export default function EmployeeClaimsPage() {
     claimedAmount: number;
     remaining: number;
   } | null>(null);
+  const reasonBoxRef = useRef<HTMLDivElement>(null);
 
   const { register, handleSubmit, watch, reset, setValue, formState: { errors } } = useForm<FormState>({
-    defaultValues: { eventId: "", amount: "", claimDate: "", reason: "", categoryId: "" },
+    defaultValues: emptyForm,
   });
 
   const editForm = useForm<FormState>();
 
   const reason = watch("reason");
   const selectedEventId = watch("eventId");
+  const selectedEvent = events.find((e) => e._id === selectedEventId);
+  const allowFuture = Boolean(selectedEvent?.allowFutureDatedClaims);
+  const maxClaimDate = allowFuture ? undefined : todayISODate();
 
   useEffect(() => {
     if (!selectedEventId) {
@@ -90,7 +117,34 @@ export default function EmployeeClaimsPage() {
     return () => clearTimeout(timer);
   }, [reason]);
 
+  useEffect(() => {
+    const onPointerDown = (e: MouseEvent) => {
+      if (!reasonBoxRef.current?.contains(e.target as Node)) {
+        setSuggestions([]);
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, []);
+
   const amountField = register("amount");
+
+  const clearForm = () => {
+    reset(emptyForm);
+    setProofFiles(null);
+    setFormError({});
+    setSuggestions([]);
+    setEventBudget(null);
+  };
+
+  const validateNewClaimDate = (claimDate: string, eventId: string) => {
+    if (!claimDate) return "Claim date is required";
+    const event = events.find((e) => e._id === eventId);
+    if (!event?.allowFutureDatedClaims && claimDate > todayISODate()) {
+      return "Future dated claims are not allowed for this event";
+    }
+    return null;
+  };
 
   const onSubmit = async (data: FormState) => {
     setFormError({});
@@ -98,7 +152,8 @@ export default function EmployeeClaimsPage() {
     if (!data.eventId) fieldErrors.eventId = "Event is required";
     const amountError = validateClaimAmount(data.amount);
     if (amountError) fieldErrors.amount = amountError;
-    if (!data.claimDate) fieldErrors.claimDate = "Claim date is required";
+    const dateError = validateNewClaimDate(data.claimDate, data.eventId);
+    if (dateError) fieldErrors.claimDate = dateError;
     if (!data.reason.trim()) fieldErrors.reason = "Reason is required";
     if (!data.categoryId) fieldErrors.categoryId = "Category is required";
     if (!proofFiles?.length) fieldErrors.proofFiles = "At least one proof file is required";
@@ -124,8 +179,7 @@ export default function EmployeeClaimsPage() {
       setFormError(json.errors || { form: json.message });
       return;
     }
-    reset();
-    setProofFiles(null);
+    clearForm();
     setRefreshKey((k) => k + 1);
   };
 
@@ -133,6 +187,7 @@ export default function EmployeeClaimsPage() {
     setEditError("");
     setEditClaim(row);
     setEditProofFiles(null);
+    setKeptProofs(Array.isArray(row.proofFiles) ? (row.proofFiles as ProofFile[]) : []);
     editForm.reset({
       eventId: String(row.eventId),
       amount: String(row.amount),
@@ -150,11 +205,21 @@ export default function EmployeeClaimsPage() {
       setEditError(amountError);
       return;
     }
+    if (!data.claimDate) {
+      setEditError("Claim date is required");
+      return;
+    }
+    if (!keptProofs.length && !editProofFiles?.length) {
+      setEditError("At least one proof file is required. Keep an existing image or upload a new one.");
+      return;
+    }
+
     const formData = new FormData();
     formData.append("amount", data.amount);
     formData.append("claimDate", data.claimDate);
     formData.append("reason", data.reason);
     formData.append("categoryId", data.categoryId);
+    formData.append("keepProofPaths", JSON.stringify(keptProofs.map((p) => p.storedPath)));
     if (editProofFiles?.length) {
       Array.from(editProofFiles).forEach((f) => formData.append("proofFiles", f));
     }
@@ -239,12 +304,27 @@ export default function EmployeeClaimsPage() {
           </div>
           <div>
             <Label required>Claim Date</Label>
-            <Input type="date" {...register("claimDate")} />
+            <DateInput
+              max={maxClaimDate}
+              value={watch("claimDate") || ""}
+              onChange={(v) => setValue("claimDate", v, { shouldDirty: true, shouldValidate: true })}
+            />
             {formError.claimDate && <p className="mt-1 text-sm text-red-600">{formError.claimDate}</p>}
+            {selectedEventId && !allowFuture && (
+              <p className="mt-1 text-xs text-slate-500">Future dates are not allowed for this event.</p>
+            )}
           </div>
-          <div className="relative md:col-span-2">
+          <div className="relative md:col-span-2" ref={reasonBoxRef}>
             <Label required>Reason / Purpose</Label>
-            <Textarea {...register("reason")} placeholder="Describe the expense" />
+            <Textarea
+              {...register("reason")}
+              placeholder="Describe the expense"
+              onFocus={() => {
+                if (reason && reason.length >= 2) {
+                  /* suggestions load via effect */
+                }
+              }}
+            />
             {suggestions.length > 0 && (
               <div className="absolute z-10 mt-1 w-full rounded-lg border bg-white shadow">
                 {suggestions.map((s) => (
@@ -275,8 +355,9 @@ export default function EmployeeClaimsPage() {
             {formError.proofFiles && <p className="mt-1 text-sm text-red-600">{formError.proofFiles}</p>}
           </div>
           {formError.form && <p className="text-sm text-red-600 md:col-span-2">{formError.form}</p>}
-          <div className="md:col-span-2">
+          <div className="flex flex-wrap gap-2 md:col-span-2">
             <Button type="submit" disabled={submitting}>{submitting ? "Submitting..." : "Submit Claim"}</Button>
+            <Button type="button" variant="ghost" onClick={clearForm}>Cancel</Button>
           </div>
         </form>
       </Card>
@@ -295,11 +376,11 @@ export default function EmployeeClaimsPage() {
             <>
               <div className="w-full sm:max-w-[180px]">
                 <Label>From Date</Label>
-                <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                <DateInput value={dateFrom} onChange={setDateFrom} />
               </div>
               <div className="w-full sm:max-w-[180px]">
                 <Label>To Date</Label>
-                <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                <DateInput value={dateTo} onChange={setDateTo} />
               </div>
             </>
           }
@@ -386,7 +467,10 @@ export default function EmployeeClaimsPage() {
           </div>
           <div>
             <Label required>Claim Date</Label>
-            <Input type="date" {...editForm.register("claimDate")} />
+            <DateInput
+              value={editForm.watch("claimDate") || ""}
+              onChange={(v) => editForm.setValue("claimDate", v, { shouldDirty: true })}
+            />
           </div>
           <div>
             <Label required>Category</Label>
@@ -401,15 +485,46 @@ export default function EmployeeClaimsPage() {
             <Textarea {...editForm.register("reason")} />
           </div>
           <div>
-            <Label>Add More Proof (optional)</Label>
-            <Input
-              type="file"
-              multiple
-              accept=".pdf,.doc,.docx,image/*"
-              onChange={(e) => setEditProofFiles(e.target.files)}
-            />
-            <div className="mt-2">
-              <ProofLinks files={editClaim?.proofFiles} />
+            <Label required>Proof Attachments</Label>
+            {keptProofs.length > 0 ? (
+              <ul className="mt-2 space-y-2">
+                {keptProofs.map((file) => (
+                  <li
+                    key={file.storedPath}
+                    className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border)] px-3 py-2 text-sm"
+                  >
+                    <a
+                      href={`/api/uploads/${file.storedPath.split("/").map(encodeURIComponent).join("/")}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="min-w-0 truncate text-[var(--primary)] underline"
+                    >
+                      {file.originalName}
+                    </a>
+                    <button
+                      type="button"
+                      className="shrink-0 rounded-md px-2 py-1 text-red-600 hover:bg-red-50"
+                      aria-label={`Remove ${file.originalName}`}
+                      onClick={() =>
+                        setKeptProofs((prev) => prev.filter((p) => p.storedPath !== file.storedPath))
+                      }
+                    >
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-sm text-slate-500">No existing proofs kept.</p>
+            )}
+            <div className="mt-3">
+              <Label>Add More Proof (optional)</Label>
+              <Input
+                type="file"
+                multiple
+                accept=".pdf,.doc,.docx,image/*"
+                onChange={(e) => setEditProofFiles(e.target.files)}
+              />
             </div>
           </div>
           {editError && <p className="text-sm text-red-600">{editError}</p>}

@@ -33,7 +33,10 @@ export function ThunderShell({ user, children }: ThunderShellProps) {
     const load = () =>
       fetch("/api/notifications?limit=1")
         .then((r) => r.json())
-        .then((d) => setUnreadCount(d.unreadCount || 0));
+        .then((d) => {
+          const next = d.unreadCount || 0;
+          setUnreadCount((prev) => (prev === next ? prev : next));
+        });
     load();
     const id = setInterval(load, 30000);
     window.addEventListener("notifications-updated", load);

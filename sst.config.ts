@@ -26,7 +26,8 @@ export default $config({
         MONGODB_URI: process.env.MONGODB_URI!,
         JWT_SECRET: process.env.JWT_SECRET!,
         NEXT_PUBLIC_APP_NAME: process.env.NEXT_PUBLIC_APP_NAME ?? "Liquid Ledger",
-        // Lambda's filesystem is read-only except /tmp, so uploads go there.
+        // Lambda /tmp is ephemeral — use MongoDB GridFS so proof files persist.
+        STORAGE_PROVIDER: "gridfs",
         UPLOAD_DIR: "/tmp/uploads",
       },
     });

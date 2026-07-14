@@ -33,7 +33,7 @@ export function ProofLinks({
         return (
           <a
             key={file.storedPath}
-            href={`/api/uploads/${file.storedPath}`}
+            href={`/api/uploads/${file.storedPath.split("/").map(encodeURIComponent).join("/")}`}
             target="_blank"
             rel="noopener noreferrer"
             title={file.originalName}

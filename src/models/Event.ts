@@ -26,6 +26,7 @@ const EventSchema = new Schema(
       required: true,
     },
     eventBudget: { type: Number, min: 0 },
+    allowFutureDatedClaims: { type: Boolean, default: false },
     assignedEmployees: { type: [AssignedEmployeeSchema], default: [] },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
   },

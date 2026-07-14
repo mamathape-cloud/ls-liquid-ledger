@@ -138,6 +138,16 @@ export async function POST(request: Request) {
       return jsonError("Event not found or inactive", 400);
     }
 
+    const claimDay = new Date(claimDate);
+    claimDay.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (!event.allowFutureDatedClaims && claimDay > today) {
+      return jsonError("Validation failed", 400, {
+        claimDate: "Future dated claims are not allowed for this event",
+      });
+    }
+
     const assigned = event.assignedEmployees.find(
       (a) => a.employeeId.toString() === session.id
     );

@@ -113,6 +113,7 @@ export async function POST(request: Request) {
       endDate: new Date(parsed.data.endDate),
       budgetType: parsed.data.budgetType,
       eventBudget: parsed.data.eventBudget,
+      allowFutureDatedClaims: parsed.data.allowFutureDatedClaims ?? false,
       assignedEmployees: parsed.data.assignedEmployees,
       createdBy: session.id,
     });

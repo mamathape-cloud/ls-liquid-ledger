@@ -17,7 +17,7 @@ export function normalizeExpenseHeads(
   return heads.map((head) => {
     const subHeads = (head.subHeads || []).map((sh) => ({
       name: sh.name.trim(),
-      amount: sh.amount,
+      amount: sh.amount ?? 0,
     }));
     if (subHeads.length > 0) {
       return { name: head.name.trim(), subHeads };
@@ -78,7 +78,7 @@ export function planToTableRows(heads: ExpenseHead[]): SavedPlanRow[] {
           subIndex,
           head: head.name,
           subHead: sub.name,
-          amount: sub.amount,
+          amount: sub.amount ?? 0,
           headTotal: headTotal(head),
         });
       });

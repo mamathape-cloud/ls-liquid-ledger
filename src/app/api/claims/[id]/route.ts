@@ -1,7 +1,6 @@
 import { connectDB } from "@/lib/db";
 import { Claim } from "@/models/Claim";
 import { Category } from "@/models/Category";
-import { Event } from "@/models/Event";
 import { requireAuth, requireModule } from "@/lib/auth";
 import { getStorageProvider } from "@/lib/storage";
 import { jsonOk, jsonError, handleApiError } from "@/lib/api";
@@ -13,6 +12,7 @@ const claimUpdateSchema = z.object({
   claimDate: z.string().min(1).optional(),
   reason: z.string().min(1).optional(),
   categoryId: z.string().min(1).optional(),
+  keepProofPaths: z.array(z.string()).optional(),
 });
 
 export async function GET(
@@ -72,11 +72,21 @@ export async function PATCH(
 
     if (contentType.includes("multipart/form-data")) {
       const formData = await request.formData();
+      const keepRaw = formData.get("keepProofPaths");
+      let keepProofPaths: string[] | undefined;
+      if (typeof keepRaw === "string" && keepRaw) {
+        try {
+          keepProofPaths = JSON.parse(keepRaw) as string[];
+        } catch {
+          return jsonError("Invalid keepProofPaths", 400);
+        }
+      }
       body = {
         amount: formData.get("amount"),
         claimDate: formData.get("claimDate"),
         reason: formData.get("reason"),
         categoryId: formData.get("categoryId"),
+        keepProofPaths,
       };
       const newFiles = formData
         .getAll("proofFiles")
@@ -91,6 +101,29 @@ export async function PATCH(
         }
       }
 
+      const parsedEarly = claimUpdateSchema.safeParse(body);
+      if (!parsedEarly.success) {
+        return jsonError("Validation failed", 400, parsedEarly.error.flatten());
+      }
+
+      if (parsedEarly.data.keepProofPaths) {
+        const keepSet = new Set(parsedEarly.data.keepProofPaths);
+        const removed = (claim.proofFiles || []).filter((f) => !keepSet.has(f.storedPath));
+        const storage = getStorageProvider();
+        for (const file of removed) {
+          await storage.delete(file.storedPath);
+        }
+        const kept = (claim.proofFiles || [])
+          .filter((f) => keepSet.has(f.storedPath))
+          .map((f) => ({
+            originalName: f.originalName,
+            storedPath: f.storedPath,
+            mimeType: f.mimeType,
+            size: f.size,
+          }));
+        claim.set("proofFiles", kept);
+      }
+
       if (newFiles.length) {
         const storage = getStorageProvider();
         const uploaded = await Promise.all(newFiles.map((f) => storage.save(f)));
@@ -98,9 +131,28 @@ export async function PATCH(
           claim.proofFiles.push(file);
         }
       }
-    } else {
-      body = await request.json();
+
+      if (!(claim.proofFiles || []).length) {
+        return jsonError("At least one proof file is required", 400);
+      }
+
+      if (parsedEarly.data.amount !== undefined) claim.amount = parsedEarly.data.amount;
+      if (parsedEarly.data.claimDate) claim.claimDate = new Date(parsedEarly.data.claimDate);
+      if (parsedEarly.data.reason) claim.reason = parsedEarly.data.reason;
+      if (parsedEarly.data.categoryId) {
+        const category = await Category.findOne({
+          _id: parsedEarly.data.categoryId,
+          active: true,
+        });
+        if (!category) return jsonError("Invalid category", 400);
+        claim.categoryId = category._id;
+      }
+
+      await claim.save();
+      return jsonOk({ claim });
     }
+
+    body = await request.json();
 
     const parsed = claimUpdateSchema.safeParse(body);
     if (!parsed.success) {

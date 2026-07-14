@@ -66,7 +66,7 @@ export interface BatchListItem {
 export interface ExpenseHead {
   name: string;
   amount?: number;
-  subHeads: { name: string; amount: number }[];
+  subHeads: { name: string; amount?: number }[];
 }
 
 export interface EventExpensePlanView {
