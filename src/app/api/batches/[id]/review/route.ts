@@ -50,7 +50,7 @@ export async function POST(
     }
 
     if (approvedSet.size === 0) {
-      batch.status = BATCH_STATUSES.DIRECTOR_REJECTED;
+      batch.status = BATCH_STATUSES.REVIEWED;
       batch.directorRejectionReason = parsed.data.rejectionReason;
       batch.directorReviewerId = session.id as unknown as typeof batch.directorReviewerId;
       batch.directorReviewedAt = new Date();
@@ -67,7 +67,7 @@ export async function POST(
         }
       );
     } else if (rejectedIds.length === 0) {
-      batch.status = BATCH_STATUSES.DIRECTOR_APPROVED;
+      batch.status = BATCH_STATUSES.REVIEWED;
       batch.directorReviewerId = session.id as unknown as typeof batch.directorReviewerId;
       batch.directorReviewedAt = new Date();
       batch.totalAmount = claims
@@ -80,11 +80,9 @@ export async function POST(
         { status: CLAIM_STATUSES.DIRECTOR_APPROVED }
       );
     } else {
-      // Partial approval
-      batch.status = BATCH_STATUSES.DIRECTOR_APPROVED;
+      batch.status = BATCH_STATUSES.REVIEWED;
       batch.directorReviewerId = session.id as unknown as typeof batch.directorReviewerId;
       batch.directorReviewedAt = new Date();
-      batch.claimIds = parsed.data.approvedClaimIds as unknown as typeof batch.claimIds;
       batch.totalAmount = claims
         .filter((c) => approvedSet.has(c._id.toString()))
         .reduce((sum, c) => sum + c.amount, 0);
@@ -109,24 +107,13 @@ export async function POST(
 
     const financeUserIds = await getUserIdsWithModule("disburse");
 
-    const notifType =
-      batch.status === BATCH_STATUSES.DIRECTOR_APPROVED
-        ? "BATCH_DIRECTOR_APPROVED"
-        : "BATCH_DIRECTOR_REJECTED";
-
-    const notifMessage =
-      batch.status === BATCH_STATUSES.DIRECTOR_APPROVED
-        ? `Batch ${batch.batchId} was reviewed. ${approvedSet.size} claim(s) approved${rejectedIds.length ? `, ${rejectedIds.length} rejected` : ""}.`
-        : `Batch ${batch.batchId} was rejected: ${parsed.data.rejectionReason}`;
+    const notifMessage = `Batch ${batch.batchId} was reviewed. ${approvedSet.size} claim(s) approved${rejectedIds.length ? `, ${rejectedIds.length} rejected` : ""}.`;
 
     await sendNotifications(
       financeUserIds.map((userId) => ({
         userId,
-        type: notifType,
-        title:
-          batch.status === BATCH_STATUSES.DIRECTOR_APPROVED
-            ? "Batch approved by Director"
-            : "Batch rejected by Director",
+        type: "BATCH_DIRECTOR_APPROVED",
+        title: "Batch reviewed by Director",
         message: notifMessage,
         link: `/finance/batches?batchId=${batch.batchId}`,
       }))

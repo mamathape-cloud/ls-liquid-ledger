@@ -1,10 +1,9 @@
 import { connectDB } from "@/lib/db";
 import { ApprovalBatch } from "@/models/ApprovalBatch";
-import { Category } from "@/models/Category";
 import { Claim } from "@/models/Claim";
-import { requireModule, requireAnyModule } from "@/lib/auth";
+import { requireAnyModule } from "@/lib/auth";
+import { findClaimsForBatch } from "@/lib/batch-claims";
 import { jsonOk, jsonError, handleApiError } from "@/lib/api";
-import { ROLES } from "@/lib/constants";
 
 export async function GET(
   _request: Request,
@@ -22,10 +21,7 @@ export async function GET(
 
     if (!batch) return jsonError("Batch not found", 404);
 
-    const claims = await Claim.find({ batchId: id })
-      .populate("employeeId", "name phone bankDetails")
-      .populate("categoryId", "name")
-      .lean();
+    const claims = await findClaimsForBatch(id, batch.claimIds || []);
 
     return jsonOk({ batch, claims });
   } catch (error) {

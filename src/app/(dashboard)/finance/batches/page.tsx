@@ -3,14 +3,19 @@
 import { useCallback, useEffect, useState } from "react";
 import { DataTable } from "@/components/DataTable";
 import { BatchClaimSelector } from "@/components/BatchClaimSelector";
+import { BatchDetailModal } from "@/components/BatchDetailModal";
+import { ClickableId } from "@/components/ClickableId";
+import { ClaimDetailModal } from "@/components/ClaimDetailModal";
+import { ActionMenu } from "@/components/ActionMenu";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 import { Label } from "@/components/ui/Label";
 import { PageHeader } from "@/components/layout/ThunderModules";
-import { formatINR, formatStatus } from "@/lib/utils";
+import { formatINR } from "@/lib/utils";
 import { downloadFile } from "@/lib/download";
-import { CLAIM_STATUSES, BATCH_STATUSES } from "@/lib/constants";
+import { canExportBatchPayout, formatBatchStatus } from "@/lib/batch-status";
+import { CLAIM_STATUSES, BATCH_STATUSES, BATCH_STATUS_UI_OPTIONS } from "@/lib/constants";
 
 export default function FinanceBatchesPage() {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -21,6 +26,9 @@ export default function FinanceBatchesPage() {
   const [loadingClaims, setLoadingClaims] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [viewBatchId, setViewBatchId] = useState<string | null>(null);
+  const [viewBatchLabel, setViewBatchLabel] = useState("");
+  const [viewClaimId, setViewClaimId] = useState<string | null>(null);
 
   const loadApprovedClaims = useCallback(async () => {
     if (!eventId) {
@@ -90,6 +98,11 @@ export default function FinanceBatchesPage() {
     }
   };
 
+  const openBatchView = (row: Record<string, unknown>) => {
+    setViewBatchId(String(row._id));
+    setViewBatchLabel(String(row.batchId || ""));
+  };
+
   const selectorClaims = approvedClaims.map((c) => ({
     _id: String(c._id),
     claimId: String(c.claimId),
@@ -149,14 +162,26 @@ export default function FinanceBatchesPage() {
             {
               key: "status",
               label: "All Status",
-              options: Object.values(BATCH_STATUSES).map((s) => ({
-                label: formatStatus(s),
-                value: s,
-              })),
+              options: [
+                { label: formatBatchStatus(BATCH_STATUSES.DRAFT), value: BATCH_STATUSES.DRAFT },
+                ...BATCH_STATUS_UI_OPTIONS.map((s) => ({
+                  label: formatBatchStatus(s),
+                  value: s,
+                })),
+              ],
             },
           ]}
           columns={[
-            { key: "batchId", header: "Batch ID" },
+            {
+              key: "batchId",
+              header: "Batch ID",
+              render: (r) => (
+                <ClickableId
+                  label={String(r.batchId)}
+                  onClick={() => openBatchView(r)}
+                />
+              ),
+            },
             { key: "eventName", header: "Event" },
             {
               key: "totalAmount",
@@ -166,27 +191,51 @@ export default function FinanceBatchesPage() {
             {
               key: "status",
               header: "Status",
-              render: (r) => formatStatus(String(r.status)),
+              render: (r) => formatBatchStatus(String(r.status)),
             },
             {
-              key: "export",
-              header: "Export",
+              key: "actions",
+              header: "Actions",
               render: (r) =>
-                r.status === BATCH_STATUSES.DIRECTOR_APPROVED ? (
+                canExportBatchPayout(String(r.status)) ? (
+                  <ActionMenu
+                    items={[
+                      { label: "View", onClick: () => openBatchView(r) },
+                      {
+                        label: "Download Excel",
+                        onClick: () => exportPayout(String(r._id)),
+                      },
+                    ]}
+                  />
+                ) : (
                   <Button
                     variant="secondary"
                     onClick={(e) => {
                       e.stopPropagation();
-                      exportPayout(String(r._id));
+                      openBatchView(r);
                     }}
                   >
-                    Download Excel
+                    View
                   </Button>
-                ) : null,
+                ),
             },
           ]}
         />
       </Card>
+
+      <BatchDetailModal
+        batchMongoId={viewBatchId}
+        batchLabel={viewBatchLabel}
+        open={!!viewBatchId}
+        onClose={() => setViewBatchId(null)}
+        onClaimClick={setViewClaimId}
+      />
+
+      <ClaimDetailModal
+        claimId={viewClaimId}
+        open={!!viewClaimId}
+        onClose={() => setViewClaimId(null)}
+      />
     </div>
   );
 }

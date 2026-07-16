@@ -15,6 +15,8 @@ import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { CollapsibleSection } from "@/components/CollapsibleSection";
+import { ActionMenu } from "@/components/ActionMenu";
 import { PageHeader } from "@/components/layout/ThunderModules";
 import { BUDGET_TYPES } from "@/lib/constants";
 import { formatINR, formatDate, formatStatus, sanitizeClaimAmountInput } from "@/lib/utils";
@@ -244,8 +246,7 @@ export default function FinanceEventsPage() {
     <div className="space-y-6">
       <PageHeader title="Events" />
 
-      <Card>
-        <h2 className="mb-4 font-semibold">Create Event</h2>
+      <CollapsibleSection title="Create Event">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div>
@@ -390,7 +391,7 @@ export default function FinanceEventsPage() {
           {formError && <p className="text-sm text-red-600">{formError}</p>}
           <Button type="submit" disabled={isSubmitting}>Create Event</Button>
         </form>
-      </Card>
+      </CollapsibleSection>
 
       <Card>
         <DataTable
@@ -426,19 +427,27 @@ export default function FinanceEventsPage() {
               key: "actions",
               header: "Actions",
               render: (r) => (
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="secondary" onClick={(e) => { e.stopPropagation(); openEdit(r); }}>
-                    Edit
-                  </Button>
-                  {r.budgetType === BUDGET_TYPES.PER_EMPLOYEE && (
-                    <Button variant="secondary" onClick={(e) => { e.stopPropagation(); openManage(r); }}>
-                      Manage Employees
-                    </Button>
-                  )}
-                  <Button variant="danger" onClick={(e) => { e.stopPropagation(); setDeleteEvent(r); }}>
-                    Delete
-                  </Button>
-                </div>
+                <ActionMenu
+                  items={[
+                    {
+                      label: "Edit",
+                      onClick: () => openEdit(r),
+                    },
+                    ...(r.budgetType === BUDGET_TYPES.PER_EMPLOYEE
+                      ? [
+                          {
+                            label: "Manage Employees",
+                            onClick: () => openManage(r),
+                          },
+                        ]
+                      : []),
+                    {
+                      label: "Delete",
+                      onClick: () => setDeleteEvent(r),
+                      variant: "danger" as const,
+                    },
+                  ]}
+                />
               ),
             },
           ]}

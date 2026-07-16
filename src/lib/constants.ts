@@ -22,9 +22,18 @@ export type ClaimStatus = (typeof CLAIM_STATUSES)[keyof typeof CLAIM_STATUSES];
 export const BATCH_STATUSES = {
   DRAFT: "DRAFT",
   SUBMITTED: "SUBMITTED",
+  REVIEWED: "REVIEWED",
+  /** @deprecated Kept for existing DB records; treat as REVIEWED in UI. */
   DIRECTOR_APPROVED: "DIRECTOR_APPROVED",
+  /** @deprecated Kept for existing DB records; treat as REVIEWED in UI. */
   DIRECTOR_REJECTED: "DIRECTOR_REJECTED",
 } as const;
+
+/** Statuses shown in Director / Finance batch filters (excludes draft & legacy). */
+export const BATCH_STATUS_UI_OPTIONS = [
+  BATCH_STATUSES.SUBMITTED,
+  BATCH_STATUSES.REVIEWED,
+] as const;
 
 export type BatchStatus = (typeof BATCH_STATUSES)[keyof typeof BATCH_STATUSES];
 

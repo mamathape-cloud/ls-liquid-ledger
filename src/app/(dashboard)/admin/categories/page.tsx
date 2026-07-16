@@ -12,6 +12,8 @@ import { Label } from "@/components/ui/Label";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { ActionMenu } from "@/components/ActionMenu";
+import { PageHeader } from "@/components/layout/ThunderModules";
 
 type CategoryForm = z.infer<typeof categorySchema>;
 
@@ -93,7 +95,7 @@ export default function AdminCategoriesPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Claim Categories</h1>
+      <PageHeader title="Claim Categories" />
 
       <Card>
         <h2 className="mb-4 font-semibold">Add Category</h2>
@@ -134,17 +136,23 @@ export default function AdminCategoriesPage() {
               key: "actions",
               header: "Actions",
               render: (r) => (
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="secondary" onClick={(e) => { e.stopPropagation(); openEdit(r); }}>
-                    Edit
-                  </Button>
-                  <Button variant="secondary" onClick={(e) => { e.stopPropagation(); toggleActive(String(r._id), Boolean(r.active)); }}>
-                    {r.active ? "Deactivate" : "Activate"}
-                  </Button>
-                  <Button variant="danger" onClick={(e) => { e.stopPropagation(); setDeleteCategory(r); }}>
-                    Delete
-                  </Button>
-                </div>
+                <ActionMenu
+                  items={[
+                    {
+                      label: "Edit",
+                      onClick: () => openEdit(r),
+                    },
+                    {
+                      label: r.active ? "Deactivate" : "Activate",
+                      onClick: () => toggleActive(String(r._id), Boolean(r.active)),
+                    },
+                    {
+                      label: "Delete",
+                      onClick: () => setDeleteCategory(r),
+                      variant: "danger",
+                    },
+                  ]}
+                />
               ),
             },
           ]}

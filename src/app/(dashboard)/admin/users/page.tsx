@@ -13,6 +13,7 @@ import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { ActionMenu } from "@/components/ActionMenu";
 import { ROLES } from "@/lib/constants";
 import { useAuth } from "@/hooks/useAuth";
 import { PageHeader } from "@/components/layout/ThunderModules";
@@ -269,17 +270,17 @@ export default function AdminUsersPage() {
                 isSystemAdminRow(r) ? (
                   <span className="text-sm text-slate-400">—</span>
                 ) : (
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="secondary" onClick={(e) => { e.stopPropagation(); openEdit(r); }}>
-                      Edit
-                    </Button>
-                    <Button variant="secondary" onClick={(e) => { e.stopPropagation(); resetPassword(r); }}>
-                      Reset Password
-                    </Button>
-                    <Button variant="danger" onClick={(e) => { e.stopPropagation(); setDeleteUser(r); }}>
-                      Delete
-                    </Button>
-                  </div>
+                  <ActionMenu
+                    items={[
+                      { label: "Edit", onClick: () => openEdit(r) },
+                      { label: "Reset Password", onClick: () => resetPassword(r) },
+                      {
+                        label: "Delete",
+                        onClick: () => setDeleteUser(r),
+                        variant: "danger",
+                      },
+                    ]}
+                  />
                 ),
             },
           ]}

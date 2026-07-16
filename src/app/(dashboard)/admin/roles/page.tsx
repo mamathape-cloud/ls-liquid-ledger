@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ModuleCheckboxGrid } from "@/components/ModuleCheckboxGrid";
+import { ActionMenu } from "@/components/ActionMenu";
 import { PageHeader } from "@/components/layout/ThunderModules";
 import { formatStatus } from "@/lib/utils";
 
@@ -189,18 +190,23 @@ export default function AdminRolesPage() {
             {
               key: "actions",
               header: "Actions",
-              render: (r) => (
-                <div className="flex flex-wrap gap-2">
+              render: (r) =>
+                r.isSystem ? (
                   <Button variant="secondary" onClick={(e) => { e.stopPropagation(); openEdit(r); }}>
                     Edit
                   </Button>
-                  {!r.isSystem && (
-                    <Button variant="danger" onClick={(e) => { e.stopPropagation(); setDeleteRole(r); }}>
-                      Delete
-                    </Button>
-                  )}
-                </div>
-              ),
+                ) : (
+                  <ActionMenu
+                    items={[
+                      { label: "Edit", onClick: () => openEdit(r) },
+                      {
+                        label: "Delete",
+                        onClick: () => setDeleteRole(r),
+                        variant: "danger",
+                      },
+                    ]}
+                  />
+                ),
             },
           ]}
         />

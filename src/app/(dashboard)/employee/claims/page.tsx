@@ -15,6 +15,9 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ProofLinks } from "@/components/ProofLinks";
 import { ClaimStatusCell } from "@/components/ClaimStatusCell";
 import { ClaimDetailModal } from "@/components/ClaimDetailModal";
+import { ClickableId } from "@/components/ClickableId";
+import { CollapsibleSection } from "@/components/CollapsibleSection";
+import { ActionMenu } from "@/components/ActionMenu";
 import { PageHeader } from "@/components/layout/ThunderModules";
 import { formatINR, formatDate, formatStatus, sanitizeClaimAmountInput, validateClaimAmount } from "@/lib/utils";
 import { todayISODate } from "@/lib/date";
@@ -258,8 +261,7 @@ export default function EmployeeClaimsPage() {
     <div className="space-y-6">
       <PageHeader title="My Claims" />
 
-      <Card>
-        <h2 className="mb-4 font-semibold">Submit New Claim</h2>
+      <CollapsibleSection title="Submit New Claim">
         <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 md:grid-cols-2">
           <div>
             <Label required>Event</Label>
@@ -372,7 +374,7 @@ export default function EmployeeClaimsPage() {
             <Button type="button" variant="ghost" onClick={clearForm}>Cancel</Button>
           </div>
         </form>
-      </Card>
+      </CollapsibleSection>
 
       <Card>
         <DataTable
@@ -416,7 +418,16 @@ export default function EmployeeClaimsPage() {
             },
           ]}
           columns={[
-            { key: "claimId", header: "Claim ID" },
+            {
+              key: "claimId",
+              header: "Claim ID",
+              render: (r) => (
+                <ClickableId
+                  label={String(r.claimId)}
+                  onClick={() => setViewClaimId(String(r._id))}
+                />
+              ),
+            },
             { key: "eventName", header: "Event" },
             { key: "amount", header: "Amount", render: (r) => formatINR(Number(r.amount)) },
             { key: "claimDate", header: "Date", render: (r) => formatDate(String(r.claimDate)) },
@@ -442,14 +453,16 @@ export default function EmployeeClaimsPage() {
               header: "Actions",
               render: (r) =>
                 r.status === CLAIM_STATUSES.SUBMITTED ? (
-                  <div className="flex gap-2">
-                    <Button variant="secondary" onClick={(e) => { e.stopPropagation(); openEdit(r); }}>
-                      Edit
-                    </Button>
-                    <Button variant="danger" onClick={(e) => { e.stopPropagation(); setDeleteClaim(r); }}>
-                      Delete
-                    </Button>
-                  </div>
+                  <ActionMenu
+                    items={[
+                      { label: "Edit", onClick: () => openEdit(r) },
+                      {
+                        label: "Delete",
+                        onClick: () => setDeleteClaim(r),
+                        variant: "danger",
+                      },
+                    ]}
+                  />
                 ) : (
                   <Button variant="secondary" onClick={(e) => { e.stopPropagation(); setViewClaimId(String(r._id)); }}>
                     View

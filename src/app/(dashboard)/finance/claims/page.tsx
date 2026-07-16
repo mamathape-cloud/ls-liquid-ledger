@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/Textarea";
 import { Label } from "@/components/ui/Label";
 import { ProofLinks } from "@/components/ProofLinks";
 import { ClaimDetailModal } from "@/components/ClaimDetailModal";
+import { ClickableId } from "@/components/ClickableId";
 import { ClaimStatusCell } from "@/components/ClaimStatusCell";
 import { PageHeader } from "@/components/layout/ThunderModules";
 import { formatINR, formatDate, formatStatus } from "@/lib/utils";
@@ -97,7 +98,16 @@ export default function FinanceClaimsPage() {
             },
           ]}
           columns={[
-            { key: "claimId", header: "Claim ID" },
+            {
+              key: "claimId",
+              header: "Claim ID",
+              render: (r) => (
+                <ClickableId
+                  label={String(r.claimId)}
+                  onClick={() => setViewClaimId(String(r._id))}
+                />
+              ),
+            },
             { key: "employeeName", header: "Employee" },
             { key: "eventName", header: "Event" },
             { key: "amount", header: "Amount", render: (r) => formatINR(Number(r.amount)) },

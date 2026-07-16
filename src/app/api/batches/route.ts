@@ -13,6 +13,7 @@ import {
   CLAIM_STATUSES,
   BATCH_STATUSES,
 } from "@/lib/constants";
+import { expandBatchStatusFilter, normalizeBatchStatus } from "@/lib/batch-status";
 import { generateBatchId } from "@/lib/utils";
 
 export async function GET(request: Request) {
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
     };
 
     if (filters.status) {
-      query.status = filters.status;
+      query.status = expandBatchStatusFilter(String(filters.status));
     } else if (session.roleSlug === ROLES.DIRECTOR) {
       query.status = { $ne: BATCH_STATUSES.DRAFT };
     }
@@ -53,7 +54,7 @@ export async function GET(request: Request) {
         eventName: (b.eventId as { name?: string })?.name,
         claimIds: b.claimIds.map((id) => id.toString()),
         totalAmount: b.totalAmount,
-        status: b.status,
+        status: normalizeBatchStatus(String(b.status)),
         submittedAt: b.submittedAt,
         createdAt: b.createdAt,
       })),

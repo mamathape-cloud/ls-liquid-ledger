@@ -6,11 +6,14 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Textarea";
 import { Label } from "@/components/ui/Label";
-import { Modal } from "@/components/ui/Modal";
 import { ProofLinks } from "@/components/ProofLinks";
-import { ClaimStatusCell } from "@/components/ClaimStatusCell";
-import { formatINR, formatDate, formatStatus } from "@/lib/utils";
-import { BATCH_STATUSES } from "@/lib/constants";
+import { ClickableId } from "@/components/ClickableId";
+import { BatchDetailModal } from "@/components/BatchDetailModal";
+import { ClaimDetailModal } from "@/components/ClaimDetailModal";
+import { ActionMenu } from "@/components/ActionMenu";
+import { formatINR, formatDate } from "@/lib/utils";
+import { BATCH_STATUSES, BATCH_STATUS_UI_OPTIONS } from "@/lib/constants";
+import { formatBatchStatus } from "@/lib/batch-status";
 import { PageHeader } from "@/components/layout/ThunderModules";
 
 interface BatchClaim {
@@ -27,25 +30,20 @@ interface BatchClaim {
   categoryId?: { name?: string };
 }
 
-const DIRECTOR_BATCH_STATUS_OPTIONS = [
-  BATCH_STATUSES.SUBMITTED,
-  BATCH_STATUSES.DIRECTOR_APPROVED,
-  BATCH_STATUSES.DIRECTOR_REJECTED,
-] as const;
-
 export default function DirectorBatchesPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [reviewBatch, setReviewBatch] = useState<Record<string, unknown> | null>(null);
-  const [viewBatch, setViewBatch] = useState<Record<string, unknown> | null>(null);
+  const [viewBatchId, setViewBatchId] = useState<string | null>(null);
+  const [viewBatchLabel, setViewBatchLabel] = useState("");
+  const [viewClaimId, setViewClaimId] = useState<string | null>(null);
   const [batchClaims, setBatchClaims] = useState<BatchClaim[]>([]);
-  const [viewClaims, setViewClaims] = useState<BatchClaim[]>([]);
   const [selectedClaimIds, setSelectedClaimIds] = useState<string[]>([]);
   const [rejectionReason, setRejectionReason] = useState("");
   const [rejectionSuggestions, setRejectionSuggestions] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [loadingClaims, setLoadingClaims] = useState(false);
-  const [loadingView, setLoadingView] = useState(false);
   const reviewSectionRef = useRef<HTMLDivElement>(null);
+  const rejectionBoxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!reviewBatch) {
@@ -63,18 +61,6 @@ export default function DirectorBatchesPage() {
       })
       .finally(() => setLoadingClaims(false));
   }, [reviewBatch]);
-
-  useEffect(() => {
-    if (!viewBatch) {
-      setViewClaims([]);
-      return;
-    }
-    setLoadingView(true);
-    fetch(`/api/batches/${viewBatch._id}`)
-      .then((r) => r.json())
-      .then((d) => setViewClaims(d.claims || []))
-      .finally(() => setLoadingView(false));
-  }, [viewBatch]);
 
   useEffect(() => {
     if (!reviewBatch) return;
@@ -97,14 +83,36 @@ export default function DirectorBatchesPage() {
     return () => clearTimeout(timer);
   }, [rejectionReason]);
 
+  useEffect(() => {
+    const onPointerDown = (e: MouseEvent) => {
+      if (!rejectionBoxRef.current?.contains(e.target as Node)) {
+        setRejectionSuggestions([]);
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, []);
+
+  const openBatchView = (row: Record<string, unknown>) => {
+    setViewBatchId(String(row._id));
+    setViewBatchLabel(String(row.batchId || ""));
+  };
+
   const toggleClaim = (id: string) => {
     setSelectedClaimIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
   };
 
-  const selectAll = () => {
-    setSelectedClaimIds(batchClaims.map((c) => c._id));
+  const allSelected =
+    batchClaims.length > 0 && selectedClaimIds.length === batchClaims.length;
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedClaimIds([]);
+    } else {
+      setSelectedClaimIds(batchClaims.map((c) => c._id));
+    }
   };
 
   const openReview = (row: Record<string, unknown>) => {
@@ -157,88 +165,66 @@ export default function DirectorBatchesPage() {
             {
               key: "status",
               label: "All Status",
-              options: DIRECTOR_BATCH_STATUS_OPTIONS.map((s) => ({
-                label: formatStatus(s),
+              options: BATCH_STATUS_UI_OPTIONS.map((s) => ({
+                label: formatBatchStatus(s),
                 value: s,
               })),
             },
           ]}
           columns={[
-            { key: "batchId", header: "Batch ID" },
+            {
+              key: "batchId",
+              header: "Batch ID",
+              render: (r) => (
+                <ClickableId
+                  label={String(r.batchId)}
+                  onClick={() => openBatchView(r)}
+                />
+              ),
+            },
             { key: "eventName", header: "Event" },
             { key: "totalAmount", header: "Total", render: (r) => formatINR(Number(r.totalAmount || 0)) },
-            { key: "status", header: "Status", render: (r) => formatStatus(String(r.status)) },
+            { key: "status", header: "Status", render: (r) => formatBatchStatus(String(r.status)) },
             {
               key: "actions",
               header: "Actions",
-              render: (r) => (
-                <div className="flex flex-wrap gap-2">
+              render: (r) =>
+                r.status === BATCH_STATUSES.SUBMITTED ? (
+                  <ActionMenu
+                    items={[
+                      { label: "View", onClick: () => openBatchView(r) },
+                      { label: "Review", onClick: () => openReview(r) },
+                    ]}
+                  />
+                ) : (
                   <Button
                     variant="secondary"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setViewBatch(r);
+                      openBatchView(r);
                     }}
                   >
                     View
                   </Button>
-                  {r.status === BATCH_STATUSES.SUBMITTED && (
-                    <Button
-                      variant="secondary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openReview(r);
-                      }}
-                    >
-                      Review
-                    </Button>
-                  )}
-                </div>
-              ),
+                ),
             },
           ]}
         />
       </Card>
 
-      <Modal
-        open={!!viewBatch}
-        onClose={() => setViewBatch(null)}
-        title={`Batch Details — ${String(viewBatch?.batchId || "")}`}
-      >
-        {loadingView ? (
-          <p className="text-sm text-slate-500">Loading...</p>
-        ) : viewClaims.length === 0 ? (
-          <p className="text-sm text-slate-500">No claims in this batch.</p>
-        ) : (
-          <div className="max-h-[60vh] space-y-3 overflow-y-auto">
-            {viewClaims.map((c) => (
-              <div key={c._id} className="rounded-lg border p-3 text-sm">
-                <div className="flex flex-wrap justify-between gap-2">
-                  <p className="font-medium">{c.claimId} — {formatINR(c.amount)}</p>
-                  {c.status && (
-                    <ClaimStatusCell
-                      status={c.status}
-                      financeRejectionReason={c.financeRejectionReason}
-                      directorRejectionReason={c.directorRejectionReason}
-                    />
-                  )}
-                </div>
-                <p className="text-slate-500">
-                  {c.employeeId?.name} · {c.categoryId?.name} · {formatDate(c.claimDate)}
-                </p>
-                <p className="mt-1 text-slate-600">{c.reason}</p>
-                <div className="mt-2">
-                  <span className="text-slate-500">Proof: </span>
-                  <ProofLinks files={c.proofFiles} />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-        <Button className="mt-4 w-full" variant="ghost" onClick={() => setViewBatch(null)}>
-          Close
-        </Button>
-      </Modal>
+      <BatchDetailModal
+        batchMongoId={viewBatchId}
+        batchLabel={viewBatchLabel}
+        open={!!viewBatchId}
+        onClose={() => setViewBatchId(null)}
+        onClaimClick={setViewClaimId}
+      />
+
+      <ClaimDetailModal
+        claimId={viewClaimId}
+        open={!!viewClaimId}
+        onClose={() => setViewClaimId(null)}
+      />
 
       {reviewBatch && (
         <div ref={reviewSectionRef} className="scroll-mt-6">
@@ -249,7 +235,9 @@ export default function DirectorBatchesPage() {
           </p>
 
           <div className="mb-3">
-            <Button variant="secondary" onClick={selectAll}>Select All</Button>
+            <Button variant="secondary" onClick={toggleSelectAll}>
+              {allSelected ? "Unselect All" : "Select All"}
+            </Button>
           </div>
 
           {loadingClaims ? (
@@ -280,7 +268,7 @@ export default function DirectorBatchesPage() {
           )}
 
           {needsRejectionReason && (
-            <div className="relative mt-4">
+            <div className="relative mt-4" ref={rejectionBoxRef}>
               <Label required>
                 {selectedClaimIds.length === 0
                   ? "Rejection Reason (rejecting all claims)"
@@ -292,7 +280,7 @@ export default function DirectorBatchesPage() {
                 placeholder="Enter reason for rejection"
               />
               {rejectionSuggestions.length > 0 && (
-                <div className="absolute z-10 mt-1 w-full rounded-lg border bg-white shadow">
+                <div className="absolute z-40 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border bg-white shadow-lg">
                   {rejectionSuggestions.map((s) => (
                     <button
                       key={s}

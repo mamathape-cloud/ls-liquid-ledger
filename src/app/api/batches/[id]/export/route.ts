@@ -3,8 +3,10 @@ import { ApprovalBatch } from "@/models/ApprovalBatch";
 import { Claim } from "@/models/Claim";
 import { requireModule } from "@/lib/auth";
 import { rowsToExcelBuffer } from "@/lib/export";
+import { findClaimsForBatch } from "@/lib/batch-claims";
+import { canExportBatchPayout } from "@/lib/batch-status";
 import { jsonError, handleApiError } from "@/lib/api";
-import { ROLES, BATCH_STATUSES } from "@/lib/constants";
+import { CLAIM_STATUSES } from "@/lib/constants";
 import { NextResponse } from "next/server";
 
 export async function GET(
@@ -19,14 +21,12 @@ export async function GET(
     const batch = await ApprovalBatch.findById(id).populate("eventId", "name");
     if (!batch) return jsonError("Batch not found", 404);
 
-    if (batch.status !== BATCH_STATUSES.DIRECTOR_APPROVED) {
-      return jsonError("Batch must be director-approved before export", 400);
+    if (!canExportBatchPayout(batch.status)) {
+      return jsonError("Batch must be reviewed before export", 400);
     }
 
-    const claims = await Claim.find({ batchId: id })
-      .populate("employeeId", "name phone bankDetails")
-      .populate("eventId", "name")
-      .lean();
+    const allClaims = await findClaimsForBatch(id, batch.claimIds || []);
+    const claims = allClaims.filter((c) => c.status === CLAIM_STATUSES.DIRECTOR_APPROVED);
 
     const rows = claims.map((c) => {
       const employee = c.employeeId as {

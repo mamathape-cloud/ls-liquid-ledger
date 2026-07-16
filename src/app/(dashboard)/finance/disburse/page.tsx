@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Button } from "@/components/ui/Button";
 import { ProofLinks } from "@/components/ProofLinks";
+import { ClickableId } from "@/components/ClickableId";
+import { ClaimDetailModal } from "@/components/ClaimDetailModal";
 import { formatINR, formatDate, formatStatus } from "@/lib/utils";
 import { CLAIM_STATUSES } from "@/lib/constants";
 import { PageHeader } from "@/components/layout/ThunderModules";
@@ -17,6 +19,7 @@ export default function FinanceDisbursePage() {
   const [paymentRef, setPaymentRef] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [viewClaimId, setViewClaimId] = useState<string | null>(null);
 
   const toggle = (id: string) => {
     setSelected((prev) =>
@@ -72,7 +75,16 @@ export default function FinanceDisbursePage() {
                 />
               ),
             },
-            { key: "claimId", header: "Claim ID" },
+            {
+              key: "claimId",
+              header: "Claim ID",
+              render: (r) => (
+                <ClickableId
+                  label={String(r.claimId)}
+                  onClick={() => setViewClaimId(String(r._id))}
+                />
+              ),
+            },
             { key: "employeeName", header: "Employee" },
             { key: "eventName", header: "Event" },
             { key: "amount", header: "Amount", render: (r) => formatINR(Number(r.amount)) },
@@ -100,6 +112,12 @@ export default function FinanceDisbursePage() {
           Mark Selected as Disbursed ({selected.length})
         </Button>
       </Card>
+
+      <ClaimDetailModal
+        claimId={viewClaimId}
+        open={!!viewClaimId}
+        onClose={() => setViewClaimId(null)}
+      />
     </div>
   );
 }
