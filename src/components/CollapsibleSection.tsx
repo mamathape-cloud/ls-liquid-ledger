@@ -58,13 +58,16 @@ export function CollapsibleSection({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-3 text-left"
+        className="group flex w-full items-center justify-between gap-3 rounded-lg text-left"
         aria-expanded={open}
       >
-        <h2 className="font-semibold text-slate-900">{title}</h2>
+        <h2 className="flex items-center gap-2 font-semibold text-[var(--primary)]">
+          <span className="h-4 w-1 rounded-full bg-[var(--primary)]" aria-hidden />
+          {title}
+        </h2>
         <span
           className={cn(
-            "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-[var(--primary-soft)] hover:text-[var(--primary)]"
+            "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)] transition group-hover:brightness-95"
           )}
           aria-label={open ? "Collapse section" : "Expand section"}
         >
