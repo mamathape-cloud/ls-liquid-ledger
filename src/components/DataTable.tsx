@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { downloadFile } from "@/lib/download";
+import { cn } from "@/lib/utils";
 import type { PaginationMeta } from "@/types";
 
 export interface Column<T> {
@@ -301,6 +302,11 @@ export function DataTable<T extends Record<string, unknown>>({
           {filters.map((filter) => (
             <div key={filter.key} className="w-full sm:max-w-[180px]">
               <Select
+                aria-label={filter.label}
+                className={cn(
+                  "border-[var(--primary)]/50 bg-[var(--primary-soft)] font-medium text-[var(--primary)]",
+                  filterValues[filter.key] && "border-[var(--primary)]"
+                )}
                 value={filterValues[filter.key] || ""}
                 onChange={(e) =>
                   setFilterValues((prev) => ({ ...prev, [filter.key]: e.target.value }))
