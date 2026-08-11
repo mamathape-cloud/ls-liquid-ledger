@@ -5,6 +5,7 @@ import { Category } from "@/models/Category";
 import { User } from "@/models/User";
 import { requireAuth, requireModule, getUserIdsWithModule } from "@/lib/auth";
 import { getStorageProvider } from "@/lib/storage";
+import { parseFormData } from "@/lib/multipart";
 import { sendNotifications } from "@/lib/notifications";
 import { parseListQuery, buildTextSearch, paginateMeta } from "@/lib/pagination";
 import { jsonOk, jsonError, handleApiError } from "@/lib/api";
@@ -99,7 +100,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const session = await requireModule("my_claims");
-    const formData = await request.formData();
+    const formData = await parseFormData(request);
 
     const eventId = String(formData.get("eventId") || "");
     const amount = Number(formData.get("amount"));

@@ -3,6 +3,7 @@ import { Claim } from "@/models/Claim";
 import { Category } from "@/models/Category";
 import { requireAuth, requireModule } from "@/lib/auth";
 import { getStorageProvider } from "@/lib/storage";
+import { parseFormData } from "@/lib/multipart";
 import { jsonOk, jsonError, handleApiError } from "@/lib/api";
 import { ROLES, CLAIM_STATUSES, ALLOWED_MIME_TYPES, MAX_FILE_SIZE } from "@/lib/constants";
 import { z } from "zod";
@@ -71,7 +72,7 @@ export async function PATCH(
     let body: Record<string, unknown> = {};
 
     if (contentType.includes("multipart/form-data")) {
-      const formData = await request.formData();
+      const formData = await parseFormData(request);
       const keepRaw = formData.get("keepProofPaths");
       let keepProofPaths: string[] | undefined;
       if (typeof keepRaw === "string" && keepRaw) {
